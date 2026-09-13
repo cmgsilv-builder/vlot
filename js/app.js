@@ -22,6 +22,20 @@ let decks = [];
 let currentDeckId = null;   // add-card
 let chosenImage = null;     // add-card selected image
 let session = null;         // { deckId, queue:[cardId] }
+let studyStats = { days: {} }; // { days: { "YYYY-MM-DD": { r, again } } } — for the Progress screen
+
+const dayKey = (d = new Date()) =>
+  d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+
+/* Record one review for today's activity (drives the Progress screen). */
+async function logReview(grade) {
+  const k = dayKey();
+  const day = studyStats.days[k] || { r: 0, again: 0 };
+  day.r += 1;
+  if (grade === 1) day.again += 1;
+  studyStats.days[k] = day;
+  await DB.setSetting("studyStats", studyStats);
+}
 
 /* ---------- toast ---------- */
 function toast(msg) {
@@ -115,6 +129,7 @@ function go(name) {
   if (name === "decks") renderDecks();
   if (name === "learn") renderLearn();
   if (name === "study") renderStudyPick();
+  if (name === "progress") renderProgress();
 }
 $$("header nav button").forEach((b) => b.addEventListener("click", () => go(b.dataset.go)));
 
@@ -463,6 +478,7 @@ async function answer(card, grade) {
   FSRS.schedule(card, grade);
   const d = decks.find((x) => x.id === session.deckOf[card.id]);
   await DB.putDeck(d);
+  await logReview(grade);
   session.queue.shift();
   if (grade === 1) session.queue.push(card.id); // relearn later this session
   nextCard();
@@ -570,6 +586,99 @@ async function loadPack(pack) {
   renderLearn();
 }
 
+/* ---------- Progress (gentle, no guilt) ---------- */
+async function renderProgress() {
+  await refresh();
+  await ensureCurriculum();
+  const all = decks.flatMap((d) => d.cards);
+  const now = Date.now();
+
+  const learned = all.filter((c) => c.reps > 0).length;
+  const knownWell = all.filter((c) => c.state === "review" && c.stability >= 7).length;
+
+  // last 7 days activity
+  const days = [];
+  for (let i = 6; i >= 0; i--) {
+    const dt = new Date(now - i * 86400000);
+    const k = dayKey(dt);
+    const rec = studyStats.days[k];
+    days.push({ k, dt, on: !!(rec && rec.r > 0), rec: rec || { r: 0, again: 0 } });
+  }
+  const daysThisWeek = days.filter((d) => d.on).length;
+  const weekR = days.reduce((s, d) => s + d.rec.r, 0);
+  const weekAgain = days.reduce((s, d) => s + d.rec.again, 0);
+  const accuracy = weekR > 0 ? Math.round(((weekR - weekAgain) / weekR) * 100) : null;
+
+  // pace: new frequency words per week (last 28 days), curriculum climb
+  const monthCards = all.filter((c) => c.source !== "inburgering" && typeof c.created === "number" && c.created >= now - 28 * 86400000).length;
+  const perWeek = monthCards / 4;
+  const cov = CUR.coverage(decks);
+
+  // ---- stat tiles ----
+  const paceLabel = perWeek >= 1 ? Math.round(perWeek) : (monthCards > 0 ? "<1" : "0");
+  $("#progStats").innerHTML = `
+    <div class="stat"><div class="n">${knownWell}</div><div class="l">words known well</div></div>
+    <div class="stat"><div class="n">${daysThisWeek}<span style="font-size:15px;color:var(--muted)">/7</span></div><div class="l">days this week</div></div>
+    <div class="stat"><div class="n">${paceLabel}</div><div class="l">new words / week</div></div>`;
+
+  // ---- gentle week row ----
+  const wd = ["S", "M", "T", "W", "T", "F", "S"];
+  const dots = days.map((d) =>
+    `<div class="day ${d.on ? "on" : ""}" title="${d.k}">${wd[d.dt.getDay()]}</div>`).join("");
+  let vibe;
+  if (daysThisWeek >= 5) vibe = "Strong week — lekker bezig! 🌱";
+  else if (daysThisWeek >= 1) vibe = "Nice, you've been showing up.";
+  else vibe = "Welcome back whenever — there's no streak to lose. 🌱";
+  const accLine = weekR >= 10 ? `<div class="muted" style="text-align:center;margin-top:6px">Recalling about <b style="color:var(--ink)">${accuracy}%</b> first-try this week (${weekR} reviews).</div>` : "";
+  $("#progWeek").innerHTML =
+    `<div class="days">${dots}</div>
+     <div class="muted" style="text-align:center">${vibe}</div>${accLine}`;
+
+  // ---- climb forecast ----
+  const fc = $("#progForecast");
+  $("#progForecastCard").hidden = cov.total === 0;
+  if (cov.total > 0) {
+    let line = `You've learned <b>${cov.maxRank}</b> frequency words — that's level <b>${cov.current}</b>.`;
+    if (cov.maxRank >= 500) {
+      line += " You've cleared the whole A1 vocabulary band — mooi zo!";
+    } else if (perWeek >= 1) {
+      const weeksLeft = Math.ceil((500 - cov.maxRank) / perWeek);
+      const eta = new Date(now + weeksLeft * 7 * 86400000);
+      const when = eta.toLocaleDateString("en-GB", { month: "long", year: "numeric" });
+      line += ` At about <b>${Math.round(perWeek)}</b> new words a week, you'll reach A1 (500 words) around <b>${when}</b>.`;
+    } else {
+      line += " Add a few words a week and your A1 date will show up here.";
+    }
+    fc.innerHTML = `<p style="margin:0;line-height:1.6">${line}</p>`;
+  }
+
+  // ---- exam readiness ----
+  const examRows = INB.PACKS.map((pack) => {
+    const dk = decks.find((d) => d.name === pack.deck);
+    if (!dk) return null;
+    const seen = dk.cards.filter((c) => c.reps > 0).length;
+    const pct = dk.cards.length ? Math.round((seen / dk.cards.length) * 100) : 0;
+    return `<div class="band" style="margin-bottom:8px">
+       <div class="band-top"><span class="pico">${pack.icon}</span>
+         <div style="min-width:0"><div class="ti">${pack.title}</div></div>
+         <span class="cnt">${seen} / ${dk.cards.length}</span></div>
+       <div class="bar"><i style="width:${pct}%"></i></div></div>`;
+  }).filter(Boolean);
+  $("#progExamCard").hidden = examRows.length === 0;
+  $("#progExam").innerHTML = examRows.join("");
+
+  // ---- toughest cards ----
+  const tough = all.filter((c) => (c.lapses || 0) > 0).sort((a, b) => b.lapses - a.lapses).slice(0, 5);
+  $("#progToughCard").hidden = tough.length === 0;
+  $("#progTough").innerHTML = tough.map((c) =>
+    `<div class="tough"><span class="tw">${escapeHtml(c.word)}</span>
+       <span class="tt">${escapeHtml(c.trans)}</span>
+       <span class="tx">${c.lapses}×</span></div>`).join("");
+}
+function escapeHtml(s) {
+  return String(s || "").replace(/[&<>"]/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[m]));
+}
+
 /* ---------- Settings / theme ---------- */
 async function applyStoredTheme() {
   const accent = await DB.getSetting("accent", "polder");
@@ -603,6 +712,8 @@ $$("#modeSeg button").forEach((b) => b.onclick = async () => {
 (async function () {
   await DB.openDB();
   await applyStoredTheme();
+  const savedStats = await DB.getSetting("studyStats", { days: {} });
+  studyStats = (savedStats && savedStats.days) ? savedStats : { days: {} };
   await refresh();
   await ensureCurriculum();   // backfill ranks/levels for existing cards
   await renderDecks();

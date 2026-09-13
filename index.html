@@ -20,6 +20,7 @@
     <button data-go="decks" class="active">Decks</button>
     <button data-go="learn">Learn</button>
     <button data-go="study">Study</button>
+    <button data-go="progress">Stats</button>
   </nav>
   <button class="iconbtn" id="settingsBtn" title="Settings" aria-label="Settings">⚙️</button>
 </header>
@@ -151,6 +152,29 @@
       <div class="card"><div class="flash" id="flash"></div></div>
     </div>
   </section>
+
+  <!-- PROGRESS -->
+  <section id="scr-progress" class="screen">
+    <div class="card">
+      <h2>Your progress</h2>
+      <p class="muted">Small steps add up. There's no streak to lose here — come back whenever it suits you.</p>
+      <div id="progStats" class="stats"></div>
+      <div id="progWeek"></div>
+    </div>
+    <div class="card" id="progForecastCard" hidden>
+      <h2>Your climb</h2>
+      <div id="progForecast"></div>
+    </div>
+    <div class="card" id="progExamCard" hidden>
+      <h2>Exam readiness</h2>
+      <div id="progExam"></div>
+    </div>
+    <div class="card" id="progToughCard" hidden>
+      <h2>Worth another look</h2>
+      <p class="muted">The words you trip over most — no shame, just handy to revisit.</p>
+      <div id="progTough"></div>
+    </div>
+  </section>
 </main>
 
 <!-- Settings sheet -->
@@ -170,7 +194,7 @@
       <button data-mode="light">Light</button>
       <button data-mode="dark">Dark</button>
     </div>
-    <div class="hint" style="margin-top:16px">Vlot is free, offline and stores everything on this device. Scheduling uses <b>FSRS</b>. Export decks to back up or move devices.</div>
+    <div class="hint" style="margin-top:16px"><b>De of Het?</b> is free, offline and stores everything on this device. Scheduling uses <b>FSRS</b>. Export decks to back up or move devices.</div>
   </div>
 </div>
 
