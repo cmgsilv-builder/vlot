@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="en" data-accent="polder">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0d9488">
+<title>Vlot — Learn Dutch</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Vlot">
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+<header>
+  <div class="mark">V</div>
+  <h1>Vlot</h1>
+  <nav>
+    <button data-go="decks" class="active">Decks</button>
+    <button data-go="learn">Learn</button>
+    <button data-go="study">Study</button>
+  </nav>
+  <button class="iconbtn" id="settingsBtn" title="Settings" aria-label="Settings">⚙️</button>
+</header>
+
+<main>
+  <!-- DECKS -->
+  <section id="scr-decks" class="screen active">
+    <div class="card">
+      <h2>New deck</h2>
+      <div class="row">
+        <input type="text" id="newDeckName" placeholder="e.g. Food, Verbs, A1 core…" style="flex:1">
+        <button class="btn" id="addDeck">Create</button>
+      </div>
+      <div class="row" style="margin-top:12px">
+        <button class="btn ghost small" id="importBtn">⬆️ Import deck file</button>
+        <input type="file" id="importFile" accept="application/json" hidden>
+      </div>
+    </div>
+    <div id="deckList"></div>
+  </section>
+
+  <!-- ADD CARD -->
+  <section id="scr-add" class="screen">
+    <div class="card">
+      <div class="row">
+        <button class="btn ghost small" id="backToDecks">← Back</button>
+        <div class="spacer"></div>
+        <span class="muted" id="addDeckLabel"></span>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>New card</h2>
+
+      <label>Dutch word</label>
+      <input type="text" id="cardWord" placeholder="e.g. appel">
+
+      <label>English translation</label>
+      <input type="text" id="cardTrans" placeholder="e.g. apple">
+
+      <div class="two">
+        <div>
+          <label>Type</label>
+          <select id="cardPos">
+            <option value="">—</option>
+            <option value="noun">noun</option>
+            <option value="verb">verb</option>
+            <option value="adjective">adjective</option>
+            <option value="adverb">adverb</option>
+            <option value="other">other</option>
+          </select>
+        </div>
+        <div id="articleWrap" hidden>
+          <label>Article</label>
+          <select id="cardArticle">
+            <option value="">—</option>
+            <option value="de">de</option>
+            <option value="het">het</option>
+          </select>
+        </div>
+      </div>
+
+      <label>Category / topic <span class="muted">(pick or type)</span></label>
+      <input type="text" id="cardCategory" list="catList" placeholder="e.g. Food">
+      <datalist id="catList"></datalist>
+      <div class="chips" id="catChips"></div>
+
+      <label>Example sentence (Dutch)</label>
+      <input type="text" id="cardSentence" placeholder="e.g. Ik eet een appel.">
+
+      <label>Sentence translation (English)</label>
+      <input type="text" id="cardSentenceTrans" placeholder="e.g. I am eating an apple.">
+
+      <label>Notes / hint <span class="muted">(optional)</span></label>
+      <textarea id="cardNotes" placeholder="plural, irregular past, memory trick…"></textarea>
+
+      <label>Image <span class="muted">(type a word and search — free)</span></label>
+      <div class="row">
+        <input type="text" id="imgQuery" placeholder="Search images…" style="flex:1" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+        <button class="btn ghost small" id="searchImg">🔍 Search</button>
+      </div>
+      <div class="imgs" id="imgResults"></div>
+      <div class="chosen" id="chosenWrap" hidden style="margin-top:8px">
+        <label>Selected</label><img id="chosenImg" alt="">
+      </div>
+
+      <div class="row" style="margin-top:16px">
+        <button class="btn" id="saveCard">Save card</button>
+        <span class="muted" id="cardCount"></span>
+      </div>
+      <div class="hint">Pronunciation plays on the study screen (🔊), not here. Images come from Openverse &amp; Wikimedia (free, no signup).</div>
+    </div>
+  </section>
+
+  <!-- LEARN -->
+  <section id="scr-learn" class="screen">
+    <div class="card">
+      <h2>Your Dutch climb</h2>
+      <p class="muted">Every word you add is ranked in the order you add it — working through your frequency book, card #1 is rank 1. As you climb, the levels below fill up.</p>
+      <div id="learnStats" class="stats"></div>
+      <div id="ladder" class="ladder"></div>
+    </div>
+    <div class="card">
+      <h2>Inburgering — exam track</h2>
+      <p class="muted">Ready-made A1 decks for the Basisexamen. Add a pack and it studies like any deck, with 🔊 and 🎤.</p>
+      <div id="inburgering"></div>
+    </div>
+    <div class="card">
+      <h2>Grammar mini-lessons</h2>
+      <p class="muted">Short notes in plain English with Dutch examples. A1 and A2 now; B1–C1 come later.</p>
+      <div id="grammar"></div>
+    </div>
+  </section>
+
+  <!-- STUDY -->
+  <section id="scr-study" class="screen">
+    <div id="studyPick" class="card">
+      <h2>Study</h2>
+      <div id="studyDeckList"></div>
+    </div>
+    <div id="studyArea" hidden>
+      <div class="card">
+        <div class="row">
+          <button class="btn ghost small" id="stopStudy">← Exit</button>
+          <div class="spacer"></div>
+          <span class="pill grey" id="studyLeft"></span>
+        </div>
+      </div>
+      <div class="card"><div class="flash" id="flash"></div></div>
+    </div>
+  </section>
+</main>
+
+<!-- Settings sheet -->
+<div class="sheet" id="settingsSheet">
+  <div class="inner">
+    <h2>Settings <button class="btn ghost small" id="closeSettings" style="margin-left:auto">Done</button></h2>
+    <label>Accent colour</label>
+    <div class="swatches">
+      <button class="sw polder" data-accent="polder" aria-pressed="true"><span class="dot"></span><span class="nm">Polder</span></button>
+      <button class="sw delft" data-accent="delft" aria-pressed="false"><span class="dot"></span><span class="nm">Delft</span></button>
+      <button class="sw tulip" data-accent="tulip" aria-pressed="false"><span class="dot"></span><span class="nm">Tulip</span></button>
+      <button class="sw midnight" data-accent="midnight" aria-pressed="false"><span class="dot"></span><span class="nm">Midnight</span></button>
+    </div>
+    <label style="margin-top:14px">Appearance</label>
+    <div class="seg" id="modeSeg">
+      <button data-mode="system" class="on">Auto</button>
+      <button data-mode="light">Light</button>
+      <button data-mode="dark">Dark</button>
+    </div>
+    <div class="hint" style="margin-top:16px">Vlot is free, offline and stores everything on this device. Scheduling uses <b>FSRS</b>. Export decks to back up or move devices.</div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="js/fsrs.js"></script>
+<script src="js/curriculum.js"></script>
+<script src="js/inburgering.js"></script>
+<script src="js/db.js"></script>
+<script src="js/tts.js"></script>
+<script src="js/images.js"></script>
+<script src="js/speech.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

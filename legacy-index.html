@@ -1,0 +1,477 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vlot — Learn Dutch</title>
+<style>
+  :root{
+    --orange:#ff6b00; --orange-dark:#e35d00; --bg:#f5f3ef; --card:#ffffff;
+    --ink:#1f2328; --muted:#6b7280; --line:#e5e2dc; --green:#16a34a; --blue:#2563eb;
+    --red:#dc2626; --yellow:#d97706; --radius:14px; --shadow:0 2px 10px rgba(0,0,0,.06);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;}
+  header{background:var(--orange);color:#fff;padding:14px 18px;display:flex;
+    align-items:center;gap:12px;position:sticky;top:0;z-index:10;box-shadow:var(--shadow)}
+  header h1{font-size:18px;margin:0;font-weight:700;letter-spacing:.2px}
+  header .flag{font-size:22px}
+  header .tag{font-size:12px;opacity:.85;font-weight:500;margin-left:-6px}
+  header nav{margin-left:auto;display:flex;gap:6px}
+  header nav button{background:rgba(255,255,255,.15);color:#fff;border:0;
+    padding:8px 12px;border-radius:10px;cursor:pointer;font-size:13px;font-weight:600}
+  header nav button.active{background:#fff;color:var(--orange-dark)}
+  main{max-width:760px;margin:0 auto;padding:18px}
+  .screen{display:none} .screen.active{display:block}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+    padding:16px;box-shadow:var(--shadow);margin-bottom:14px}
+  h2{font-size:16px;margin:0 0 12px}
+  label{display:block;font-size:13px;color:var(--muted);margin:10px 0 4px;font-weight:600}
+  input[type=text]{width:100%;padding:11px 12px;border:1px solid var(--line);
+    border-radius:10px;font-size:15px;background:#fff}
+  input[type=text]:focus{outline:2px solid var(--orange);border-color:var(--orange)}
+  button{font-family:inherit}
+  .btn{background:var(--orange);color:#fff;border:0;padding:11px 16px;border-radius:10px;
+    cursor:pointer;font-size:14px;font-weight:700}
+  .btn:hover{background:var(--orange-dark)}
+  .btn.ghost{background:#fff;color:var(--ink);border:1px solid var(--line);font-weight:600}
+  .btn.small{padding:7px 11px;font-size:13px}
+  .btn.icon{padding:8px 10px}
+  .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .muted{color:var(--muted);font-size:13px}
+  .deck{display:flex;align-items:center;gap:12px;padding:14px 16px;border:1px solid var(--line);
+    border-radius:var(--radius);background:#fff;margin-bottom:10px;box-shadow:var(--shadow)}
+  .deck .name{font-weight:700;font-size:15px}
+  .deck .meta{font-size:12px;color:var(--muted);margin-top:2px}
+  .pill{background:var(--orange);color:#fff;border-radius:999px;padding:2px 9px;font-size:12px;font-weight:700}
+  .pill.grey{background:#eee;color:var(--muted)}
+  .spacer{flex:1}
+  .imgs{display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:8px;margin-top:8px}
+  .imgs img{width:100%;height:90px;object-fit:cover;border-radius:10px;cursor:pointer;
+    border:3px solid transparent;background:#eee}
+  .imgs img.sel{border-color:var(--orange)}
+  .chosen{margin-top:8px}
+  .chosen img{max-height:150px;border-radius:12px;border:1px solid var(--line)}
+  /* study */
+  .flash{min-height:260px;display:flex;flex-direction:column;align-items:center;
+    justify-content:center;text-align:center;padding:24px;gap:14px}
+  .flash .word{font-size:34px;font-weight:800}
+  .flash .trans{font-size:24px;color:var(--orange-dark);font-weight:700}
+  .flash img{max-height:180px;border-radius:12px;border:1px solid var(--line)}
+  .grades{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:6px}
+  .grades button{border:0;border-radius:10px;padding:12px 6px;color:#fff;cursor:pointer;
+    font-weight:700;font-size:13px;display:flex;flex-direction:column;gap:3px}
+  .grades small{font-weight:500;opacity:.85;font-size:11px}
+  .g-again{background:var(--red)} .g-hard{background:var(--yellow)}
+  .g-good{background:var(--green)} .g-easy{background:var(--blue)}
+  .empty{text-align:center;color:var(--muted);padding:40px 10px}
+  .toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);
+    background:#222;color:#fff;padding:10px 16px;border-radius:10px;font-size:14px;
+    box-shadow:var(--shadow);opacity:0;transition:.25s;pointer-events:none;z-index:50}
+  .toast.show{opacity:1}
+  .hint{font-size:12px;color:var(--muted);margin-top:6px}
+  a{color:var(--blue)}
+</style>
+</head>
+<body>
+<header>
+  <span class="flag">🇳🇱</span>
+  <h1>Vlot</h1>
+  <span class="tag">Learn Dutch</span>
+  <nav>
+    <button data-go="decks" class="active">Decks</button>
+    <button data-go="study">Study</button>
+  </nav>
+</header>
+
+<main>
+  <!-- ========== DECKS ========== -->
+  <section id="scr-decks" class="screen active">
+    <div class="card">
+      <h2>New deck</h2>
+      <div class="row">
+        <input type="text" id="newDeckName" placeholder="e.g. Food, Verbs, Home...">
+        <button class="btn" id="addDeck">Create</button>
+      </div>
+      <div class="row" style="margin-top:12px">
+        <button class="btn ghost small" id="importBtn">⬆️ Import file</button>
+        <input type="file" id="importFile" accept="application/json" hidden>
+      </div>
+    </div>
+
+    <div id="deckList"></div>
+  </section>
+
+  <!-- ========== ADD CARD ========== -->
+  <section id="scr-add" class="screen">
+    <div class="card">
+      <div class="row">
+        <button class="btn ghost small" id="backToDecks">← Back</button>
+        <div class="spacer"></div>
+        <span class="muted" id="addDeckLabel"></span>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>New card</h2>
+      <label>Dutch word</label>
+      <div class="row">
+        <input type="text" id="cardWord" placeholder="e.g. hond" style="flex:1">
+        <button class="btn icon" id="speakWord" title="Listen">🔊</button>
+      </div>
+      <label>English translation</label>
+      <input type="text" id="cardTrans" placeholder="e.g. dog">
+
+      <label>Image <span class="muted">(type the word and search)</span></label>
+      <div class="row">
+        <input type="text" id="imgQuery" placeholder="Search images..." style="flex:1">
+        <button class="btn ghost small" id="searchImg">🔍 Search</button>
+      </div>
+      <div class="imgs" id="imgResults"></div>
+      <div class="chosen" id="chosenWrap" hidden>
+        <label>Selected:</label><br><img id="chosenImg" alt="">
+      </div>
+
+      <div class="row" style="margin-top:16px">
+        <button class="btn" id="saveCard">Save card</button>
+        <span class="muted" id="cardCount"></span>
+      </div>
+      <div class="hint">Image search uses Openverse and Wikimedia (free, no signup). The selected image is saved together with the card.</div>
+    </div>
+  </section>
+
+  <!-- ========== STUDY ========== -->
+  <section id="scr-study" class="screen">
+    <div id="studyPick" class="card">
+      <h2>Study</h2>
+      <div id="studyDeckList"></div>
+    </div>
+    <div id="studyArea" hidden>
+      <div class="card">
+        <div class="row">
+          <button class="btn ghost small" id="stopStudy">← Exit</button>
+          <div class="spacer"></div>
+          <span class="pill grey" id="studyLeft"></span>
+        </div>
+      </div>
+      <div class="card">
+        <div class="flash" id="flash"></div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script>
+"use strict";
+
+/* ============ IndexedDB (local storage) ============ */
+const DB_NAME="vlot_flashcards", STORE="decks";
+let db;
+function openDB(){
+  return new Promise((res,rej)=>{
+    const r=indexedDB.open(DB_NAME,1);
+    r.onupgradeneeded=e=>{ e.target.result.createObjectStore(STORE,{keyPath:"id"}); };
+    r.onsuccess=e=>{db=e.target.result;res();};
+    r.onerror=e=>rej(e);
+  });
+}
+function tx(mode){ return db.transaction(STORE,mode).objectStore(STORE); }
+function putDeck(d){ return new Promise((res,rej)=>{const r=tx("readwrite").put(d);r.onsuccess=res;r.onerror=rej;}); }
+function delDeck(id){ return new Promise((res,rej)=>{const r=tx("readwrite").delete(id);r.onsuccess=res;r.onerror=rej;}); }
+function allDecks(){ return new Promise((res,rej)=>{const r=tx("readonly").getAll();r.onsuccess=()=>res(r.result||[]);r.onerror=rej;}); }
+
+/* ============ Helpers ============ */
+const $=s=>document.querySelector(s);
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+const now=()=>Date.now();
+const DAY=86400000;
+function toast(msg){const t=$("#toast");t.textContent=msg;t.classList.add("show");
+  clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove("show"),2200);}
+
+/* ============ TTS (Dutch voice, free) ============ */
+let voices=[];
+function loadVoices(){ voices=speechSynthesis.getVoices(); }
+if("speechSynthesis" in window){ loadVoices(); speechSynthesis.onvoiceschanged=loadVoices; }
+function speak(text){
+  if(!("speechSynthesis" in window)){toast("Your browser has no speech support.");return;}
+  speechSynthesis.cancel();
+  const u=new SpeechSynthesisUtterance(text);
+  u.lang="nl-NL";
+  const nl=voices.find(v=>v.lang&&v.lang.toLowerCase().startsWith("nl"));
+  if(nl)u.voice=nl; else toast("No Dutch voice installed — using default.");
+  speechSynthesis.speak(u);
+}
+
+/* ============ SM-2 (spaced repetition) ============ */
+function newCardSR(){ return {ef:2.5,interval:0,reps:0,due:now()}; }
+function grade(card,q){ // q: again=1, hard=3, good=4, easy=5
+  if(q<3){ card.reps=0; card.interval=0; card.due=now(); } // comes back this session
+  else{
+    if(card.reps===0) card.interval=1;
+    else if(card.reps===1) card.interval=6;
+    else card.interval=Math.round(card.interval*card.ef);
+    card.reps+=1;
+    card.due=now()+card.interval*DAY;
+  }
+  card.ef=Math.max(1.3, card.ef+(0.1-(5-q)*(0.08+(5-q)*0.02)));
+  return card;
+}
+const endOfToday=()=> new Date(new Date().setHours(23,59,59,999)).getTime();
+function dueCount(deck){ const t=endOfToday(); return deck.cards.filter(c=>c.due<=t).length; }
+
+/* ============ State ============ */
+let decks=[];
+let currentDeckId=null;   // add-card screen
+let chosenImage=null;     // add-card selected image
+let session=null;         // {deckId, queue:[cardId...]}
+
+/* ============ Navigation ============ */
+function go(name){
+  document.querySelectorAll(".screen").forEach(s=>s.classList.remove("active"));
+  $("#scr-"+name).classList.add("active");
+  document.querySelectorAll("header nav button").forEach(b=>
+    b.classList.toggle("active", b.dataset.go===name));
+  if(name==="decks") renderDecks();
+  if(name==="study") renderStudyPick();
+}
+document.querySelectorAll("header nav button").forEach(b=>
+  b.addEventListener("click",()=>go(b.dataset.go)));
+
+/* ============ Decks screen ============ */
+async function renderDecks(){
+  decks=await allDecks();
+  const el=$("#deckList");
+  if(decks.length===0){ el.innerHTML='<div class="empty">No decks yet. Create one above. 👆</div>'; return; }
+  el.innerHTML="";
+  decks.forEach(d=>{
+    const div=document.createElement("div");
+    div.className="deck";
+    const due=dueCount(d);
+    div.innerHTML=`
+      <div>
+        <div class="name"></div>
+        <div class="meta">${d.cards.length} cards</div>
+      </div>
+      <div class="spacer"></div>
+      ${due>0?`<span class="pill">${due} due today</span>`:'<span class="pill grey">all caught up</span>'}
+      <button class="btn small" data-act="add">+ Card</button>
+      <button class="btn ghost small" data-act="export">⬇️</button>
+      <button class="btn ghost small" data-act="del">🗑️</button>`;
+    div.querySelector(".name").textContent=d.name;
+    div.querySelector('[data-act=add]').onclick=()=>openAdd(d.id);
+    div.querySelector('[data-act=export]').onclick=()=>exportDeck(d);
+    div.querySelector('[data-act=del]').onclick=()=>removeDeck(d);
+    el.appendChild(div);
+  });
+}
+$("#addDeck").onclick=async()=>{
+  const name=$("#newDeckName").value.trim();
+  if(!name){toast("Give the deck a name.");return;}
+  await putDeck({id:uid(),name,cards:[]});
+  $("#newDeckName").value="";
+  renderDecks(); toast("Deck created!");
+};
+async function removeDeck(d){
+  if(!confirm(`Delete the deck "${d.name}" and all its cards?`))return;
+  await delDeck(d.id); renderDecks(); toast("Deck deleted.");
+}
+
+/* ============ Add card screen ============ */
+function openAdd(deckId){
+  currentDeckId=deckId; chosenImage=null;
+  const d=decks.find(x=>x.id===deckId);
+  $("#addDeckLabel").textContent="Deck: "+d.name;
+  $("#cardWord").value=""; $("#cardTrans").value=""; $("#imgQuery").value="";
+  $("#imgResults").innerHTML=""; $("#chosenWrap").hidden=true;
+  updateCardCount();
+  go("add");
+}
+$("#backToDecks").onclick=()=>go("decks");
+$("#speakWord").onclick=()=>{const w=$("#cardWord").value.trim();if(w)speak(w);};
+$("#cardWord").addEventListener("input",e=>{ $("#imgQuery").value=e.target.value; });
+
+function updateCardCount(){
+  const d=decks.find(x=>x.id===currentDeckId);
+  $("#cardCount").textContent=d?`${d.cards.length} cards in deck`:"";
+}
+
+/* ---- Image search (Openverse + Wikimedia, free, no key) ---- */
+async function searchOpenverse(q){
+  const url="https://api.openverse.org/v1/images/?q="+encodeURIComponent(q)+"&page_size=12&mature=false";
+  const r=await fetch(url); if(!r.ok) throw 0;
+  const j=await r.json();
+  return (j.results||[]).map(x=>({thumb:x.thumbnail||x.url, full:x.url}));
+}
+async function searchWikimedia(q){
+  const url="https://commons.wikimedia.org/w/api.php?action=query&generator=search"+
+    "&gsrsearch="+encodeURIComponent(q)+"&gsrnamespace=6&gsrlimit=12"+
+    "&prop=imageinfo&iiprop=url&iiurlwidth=200&format=json&origin=*";
+  const r=await fetch(url); if(!r.ok) throw 0;
+  const j=await r.json();
+  const pages=j.query&&j.query.pages?Object.values(j.query.pages):[];
+  return pages.filter(p=>p.imageinfo).map(p=>({
+    thumb:p.imageinfo[0].thumburl, full:p.imageinfo[0].url}));
+}
+$("#searchImg").onclick=doSearch;
+async function doSearch(){
+  const q=$("#imgQuery").value.trim();
+  if(!q){toast("Type something to search.");return;}
+  const box=$("#imgResults");
+  box.innerHTML='<div class="muted" style="grid-column:1/-1">Searching...</div>';
+  let results=[];
+  try{ results=await searchOpenverse(q); }catch(e){}
+  if(results.length===0){ try{ results=await searchWikimedia(q); }catch(e){} }
+  if(results.length===0){ box.innerHTML='<div class="muted" style="grid-column:1/-1">Nothing found (or no internet). Try another word.</div>'; return; }
+  box.innerHTML="";
+  results.forEach(res=>{
+    const img=document.createElement("img");
+    img.src=res.thumb; img.loading="lazy"; img.alt="";
+    img.onclick=()=>pickImage(img,res);
+    img.onerror=()=>img.remove();
+    box.appendChild(img);
+  });
+}
+async function pickImage(imgEl,res){
+  document.querySelectorAll("#imgResults img").forEach(i=>i.classList.remove("sel"));
+  imgEl.classList.add("sel");
+  // try to convert to base64 (offline). If CORS fails, keep the URL.
+  let data=res.thumb;
+  try{
+    const resp=await fetch(res.thumb,{mode:"cors"});
+    const blob=await resp.blob();
+    data=await new Promise(r=>{const fr=new FileReader();fr.onload=()=>r(fr.result);fr.readAsDataURL(blob);});
+  }catch(e){ /* keep the URL */ }
+  chosenImage=data;
+  $("#chosenImg").src=data; $("#chosenWrap").hidden=false;
+}
+$("#saveCard").onclick=async()=>{
+  const word=$("#cardWord").value.trim();
+  const trans=$("#cardTrans").value.trim();
+  if(!word||!trans){toast("Fill in the word and translation.");return;}
+  const d=decks.find(x=>x.id===currentDeckId);
+  d.cards.push({id:uid(),word,trans,img:chosenImage,...newCardSR()});
+  await putDeck(d);
+  toast("Card saved! ✅");
+  // clear for next
+  $("#cardWord").value=""; $("#cardTrans").value=""; $("#imgQuery").value="";
+  $("#imgResults").innerHTML=""; $("#chosenWrap").hidden=true; chosenImage=null;
+  updateCardCount();
+  $("#cardWord").focus();
+};
+
+/* ============ Export / Import ============ */
+function exportDeck(d){
+  const blob=new Blob([JSON.stringify(d,null,2)],{type:"application/json"});
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(blob);
+  a.download=d.name.replace(/[^\w\-]+/g,"_")+".json";
+  a.click(); URL.revokeObjectURL(a.href);
+  toast("Deck exported.");
+}
+$("#importBtn").onclick=()=>$("#importFile").click();
+$("#importFile").onchange=async e=>{
+  const f=e.target.files[0]; if(!f)return;
+  try{
+    const d=JSON.parse(await f.text());
+    if(!d.name||!Array.isArray(d.cards)) throw 0;
+    d.id=uid(); // new id so it doesn't overwrite
+    d.cards.forEach(c=>{ if(c.ef===undefined) Object.assign(c,newCardSR()); if(!c.id)c.id=uid(); });
+    await putDeck(d); renderDecks(); toast("Deck imported! ✅");
+  }catch(err){ toast("Invalid file."); }
+  e.target.value="";
+};
+
+/* ============ Study screen ============ */
+async function renderStudyPick(){
+  decks=await allDecks();
+  const el=$("#studyDeckList");
+  $("#studyArea").hidden=true; $("#studyPick").hidden=false;
+  if(decks.length===0){ el.innerHTML='<div class="empty">Create a deck and some cards first. 🙂</div>'; return; }
+  el.innerHTML="";
+  decks.forEach(d=>{
+    const due=dueCount(d);
+    const div=document.createElement("div");
+    div.className="deck";
+    div.innerHTML=`<div><div class="name"></div>
+      <div class="meta">${d.cards.length} cards</div></div>
+      <div class="spacer"></div>
+      ${due>0?`<span class="pill">${due} due today</span>`:'<span class="pill grey">all caught up</span>'}
+      <button class="btn small">Study</button>`;
+    div.querySelector(".name").textContent=d.name;
+    div.querySelector("button").onclick=()=>startStudy(d.id);
+    el.appendChild(div);
+  });
+}
+function startStudy(deckId){
+  const d=decks.find(x=>x.id===deckId);
+  const t=endOfToday();
+  const dueCards=d.cards.filter(c=>c.due<=t);
+  if(dueCards.length===0){ toast("Nothing to review today in this deck. 🎉"); return; }
+  session={deckId, queue:dueCards.map(c=>c.id)};
+  $("#studyPick").hidden=true; $("#studyArea").hidden=false;
+  nextCard();
+}
+$("#stopStudy").onclick=()=>{ session=null; renderStudyPick(); };
+
+function nextCard(){
+  if(!session||session.queue.length===0){
+    $("#flash").innerHTML='<div class="empty"><div style="font-size:40px">🎉</div>Done for today! Nice work.</div>';
+    $("#studyLeft").textContent="0";
+    setTimeout(()=>{session=null;renderStudyPick();},1400);
+    return;
+  }
+  $("#studyLeft").textContent=session.queue.length+" left";
+  const d=decks.find(x=>x.id===session.deckId);
+  const card=d.cards.find(c=>c.id===session.queue[0]);
+  showFront(card);
+}
+function showFront(card){
+  const f=$("#flash");
+  f.innerHTML="";
+  const word=document.createElement("div"); word.className="word"; word.textContent=card.word;
+  const spk=document.createElement("button"); spk.className="btn ghost small"; spk.textContent="🔊 Listen";
+  spk.onclick=()=>speak(card.word);
+  const show=document.createElement("button"); show.className="btn"; show.textContent="Show answer";
+  show.onclick=()=>showBack(card);
+  f.append(word,spk,show);
+  speak(card.word); // speak on appear
+}
+function showBack(card){
+  const f=$("#flash");
+  f.innerHTML="";
+  const word=document.createElement("div"); word.className="word"; word.textContent=card.word;
+  const spk=document.createElement("button"); spk.className="btn ghost small"; spk.textContent="🔊";
+  spk.onclick=()=>speak(card.word);
+  const trans=document.createElement("div"); trans.className="trans"; trans.textContent=card.trans;
+  f.append(word,spk,trans);
+  if(card.img){ const im=document.createElement("img"); im.src=card.img; im.alt=""; f.appendChild(im); }
+  const grades=document.createElement("div"); grades.className="grades";
+  grades.innerHTML=`
+    <button class="g-again">Again<small>&lt; 1 min</small></button>
+    <button class="g-hard">Hard<small>~1 day</small></button>
+    <button class="g-good">Good<small>+ time</small></button>
+    <button class="g-easy">Easy<small>+ time</small></button>`;
+  const qs=[1,3,4,5];
+  grades.querySelectorAll("button").forEach((b,i)=>b.onclick=()=>answer(card,qs[i]));
+  f.appendChild(grades);
+}
+async function answer(card,q){
+  grade(card,q);
+  const d=decks.find(x=>x.id===session.deckId);
+  await putDeck(d);
+  session.queue.shift();
+  if(q<3) session.queue.push(card.id); // "Again" goes to the end
+  nextCard();
+}
+
+/* ============ Boot ============ */
+(async function(){
+  await openDB();
+  await renderDecks();
+})();
+</script>
+</body>
+</html>
