@@ -6,6 +6,9 @@
     </linearGradient>
   </defs>
   <rect width="512" height="512" rx="114" fill="url(#g)"/>
-  <text x="256" y="366" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif"
-        font-size="340" font-weight="900" fill="#ffffff">V</text>
+  <g font-family="Helvetica, Arial, sans-serif" text-anchor="middle" fill="#ffffff">
+    <text x="256" y="212" font-size="150" font-weight="800" letter-spacing="-4">de</text>
+    <text x="256" y="300" font-size="80" font-weight="600" fill="#dcfce7" opacity="0.9">of</text>
+    <text x="256" y="432" font-size="150" font-weight="800" letter-spacing="-4">het?</text>
+  </g>
 </svg>
