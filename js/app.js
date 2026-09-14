@@ -37,6 +37,13 @@ async function logReview(grade) {
   await DB.setSetting("studyStats", studyStats);
 }
 
+/* Animate any .bar fills from 0 → their data-w% for a subtle entrance. */
+function paintBars() {
+  requestAnimationFrame(() => {
+    $$(".bar > i[data-w]").forEach((el) => { el.style.width = el.dataset.w + "%"; });
+  });
+}
+
 /* ---------- toast ---------- */
 function toast(msg) {
   const t = $("#toast");
@@ -326,6 +333,7 @@ function beginSession(entries, emptyMsg) {
   session = {
     queue: use.map((e) => e.card.id),
     deckOf: Object.fromEntries(use.map((e) => [e.card.id, e.deckId])),
+    reviewed: 0,
   };
   enterStudyUI();
   nextCard();
@@ -351,9 +359,10 @@ $("#stopStudy").onclick = () => { session = null; renderStudyPick(); };
 function nextCard() {
   const f = $("#flash");
   if (!session || !session.queue.length) {
-    f.innerHTML = '<div class="empty"><div class="big">🎉</div>Done for now. Mooi zo!</div>';
+    const n = session ? session.reviewed : 0;
+    f.innerHTML = `<div class="empty"><div class="big">🎉</div>Done for now — you reviewed ${n} card${n === 1 ? "" : "s"}. Mooi zo! 🌱</div>`;
     $("#studyLeft").textContent = "0 left";
-    setTimeout(() => { session = null; renderStudyPick(); }, 1300);
+    setTimeout(() => { session = null; renderStudyPick(); }, 1600);
     return;
   }
   $("#studyLeft").textContent = session.queue.length + " left";
@@ -479,6 +488,7 @@ async function answer(card, grade) {
   const d = decks.find((x) => x.id === session.deckOf[card.id]);
   await DB.putDeck(d);
   await logReview(grade);
+  session.reviewed += 1;
   session.queue.shift();
   if (grade === 1) session.queue.push(card.id); // relearn later this session
   nextCard();
@@ -511,11 +521,12 @@ async function renderLearn() {
          <div style="min-width:0"><div class="ti">${b.title}</div><div class="bl">${b.blurb}</div></div>
          <span class="cnt">${b.have} / ${b.size}</span>
        </div>
-       <div class="bar"><i style="width:${b.pct}%"></i></div>
+       <div class="bar"><i data-w="${b.pct}" style="width:0"></i></div>
        <div class="actions"><button class="btn ghost small" ${b.have ? "" : "disabled style=opacity:.45"}>▶ Study ${b.level} words</button></div>`;
     if (b.have) div.querySelector("button").onclick = () => startStudyByLevel(b.level);
     ladder.appendChild(div);
   });
+  paintBars();
 
   renderInburgering();
 
@@ -593,6 +604,15 @@ async function renderProgress() {
   const all = decks.flatMap((d) => d.cards);
   const now = Date.now();
 
+  if (all.length === 0) {
+    $("#progStats").innerHTML = '<div class="empty" style="flex:1 1 100%"><div class="big">🌱</div>Add some cards, then your progress grows here.</div>';
+    $("#progWeek").innerHTML = "";
+    $("#progForecastCard").hidden = true;
+    $("#progExamCard").hidden = true;
+    $("#progToughCard").hidden = true;
+    return;
+  }
+
   const learned = all.filter((c) => c.reps > 0).length;
   const knownWell = all.filter((c) => c.state === "review" && c.stability >= 7).length;
 
@@ -623,8 +643,8 @@ async function renderProgress() {
 
   // ---- gentle week row ----
   const wd = ["S", "M", "T", "W", "T", "F", "S"];
-  const dots = days.map((d) =>
-    `<div class="day ${d.on ? "on" : ""}" title="${d.k}">${wd[d.dt.getDay()]}</div>`).join("");
+  const dots = days.map((d, idx) =>
+    `<div class="day ${d.on ? "on" : ""} ${idx === days.length - 1 ? "today" : ""}" title="${d.k}">${wd[d.dt.getDay()]}</div>`).join("");
   let vibe;
   if (daysThisWeek >= 5) vibe = "Strong week — lekker bezig! 🌱";
   else if (daysThisWeek >= 1) vibe = "Nice, you've been showing up.";
@@ -662,10 +682,11 @@ async function renderProgress() {
        <div class="band-top"><span class="pico">${pack.icon}</span>
          <div style="min-width:0"><div class="ti">${pack.title}</div></div>
          <span class="cnt">${seen} / ${dk.cards.length}</span></div>
-       <div class="bar"><i style="width:${pct}%"></i></div></div>`;
+       <div class="bar"><i data-w="${pct}" style="width:0"></i></div></div>`;
   }).filter(Boolean);
   $("#progExamCard").hidden = examRows.length === 0;
   $("#progExam").innerHTML = examRows.join("");
+  paintBars();
 
   // ---- toughest cards ----
   const tough = all.filter((c) => (c.lapses || 0) > 0).sort((a, b) => b.lapses - a.lapses).slice(0, 5);
