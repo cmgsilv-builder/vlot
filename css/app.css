@@ -209,6 +209,26 @@ a{color:var(--a1)}
 .pack-ft .meta{font-size:12px;color:var(--muted)}
 .pack-ft button{margin-left:auto;flex:none}
 
+/* Mock exam */
+#scr-exam .qhead{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+.exam-timer{margin-left:auto;font-weight:800;font-variant-numeric:tabular-nums;
+  background:var(--a-soft);color:var(--a1);border:1px solid var(--line);border-radius:999px;padding:4px 12px}
+.exam-timer.low{background:var(--bad);color:#fff;border-color:transparent;animation:pulse 1s infinite}
+.qprompt{font-size:22px;font-weight:800;text-align:center;margin:18px 12px 20px;line-height:1.35}
+.opts{display:flex;flex-direction:column;gap:10px}
+.opt{text-align:left;background:var(--panel-2);border:1px solid var(--line);border-radius:12px;
+  padding:14px 16px;font-size:15px;font-weight:600;color:var(--ink);cursor:pointer}
+.opt:hover{border-color:var(--a1)} .opt:active{transform:translateY(1px)}
+.result-hero{text-align:center;padding:10px 0 4px}
+.result-score{font-size:46px;font-weight:900;color:var(--a1);line-height:1}
+.result-badge{display:inline-block;font-weight:900;border-radius:999px;padding:6px 16px;font-size:14px;margin-top:10px}
+.result-badge.pass{background:var(--good);color:#fff}
+.result-badge.fail{background:var(--warn);color:#fff}
+.miss{border-top:1px solid var(--line-2);padding:10px 0}
+.miss .mq{font-weight:700;font-size:14px}
+.miss .my{font-size:13px;color:var(--bad);margin-top:2px}
+.miss .mc{font-size:13px;color:var(--good)}
+
 /* Grammar lessons (accordion) */
 .lesson{border:1px solid var(--line);border-radius:12px;margin-top:8px;overflow:hidden;background:var(--panel-2)}
 .lesson > summary{cursor:pointer;padding:12px;font-weight:800;font-size:14px;

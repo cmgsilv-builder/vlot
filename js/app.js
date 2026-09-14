@@ -23,6 +23,12 @@ let currentDeckId = null;   // add-card
 let chosenImage = null;     // add-card selected image
 let session = null;         // { deckId, queue:[cardId] }
 let studyStats = { days: {} }; // { days: { "YYYY-MM-DD": { r, again } } } — for the Progress screen
+let exam = null;               // active mock exam: { pack, qs, i, count, need, endAt, timer }
+
+function shuffle(a) {
+  for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
+  return a;
+}
 
 const dayKey = (d = new Date()) =>
   d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
@@ -130,6 +136,7 @@ function findCardById(id) {
 
 /* ---------- navigation ---------- */
 function go(name) {
+  if (name !== "exam" && exam && exam.timer) { clearInterval(exam.timer); exam.timer = null; exam = null; }
   $$(".screen").forEach((s) => s.classList.remove("active"));
   $("#scr-" + name).classList.add("active");
   $$("header nav button").forEach((b) => b.classList.toggle("active", b.dataset.go === name));
@@ -137,6 +144,7 @@ function go(name) {
   if (name === "learn") renderLearn();
   if (name === "study") renderStudyPick();
   if (name === "progress") renderProgress();
+  if (name === "exam") renderExamSetup();
 }
 $$("header nav button").forEach((b) => b.addEventListener("click", () => go(b.dataset.go)));
 
@@ -548,6 +556,30 @@ function renderInburgering() {
   wrap.innerHTML = "";
   renderExamStage(wrap, INB.EXAM.a1, "A1");
   renderExamStage(wrap, INB.EXAM.a2, "A2");
+  // mock-exam launcher
+  const mocks = availableMocks();
+  const cta = document.createElement("div");
+  cta.className = "pack";
+  cta.innerHTML =
+    `<div class="pack-hd"><span class="pico">🎯</span>
+       <div style="min-width:0"><div class="ti">Mock exam</div>
+         <div class="bl">${mocks.length ? "A timed, multiple-choice test built from your added KNM / vocab packs. Doesn't affect your study schedule." : "Add a KNM or vocabulary pack above to unlock a timed mock exam."}</div></div>
+     </div>
+     <div class="pack-ft"><span class="meta"></span>
+       <button class="btn small" ${mocks.length ? "" : "disabled style=opacity:.45"}>🎯 Take a mock exam</button></div>`;
+  if (mocks.length) cta.querySelector("button").onclick = () => go("exam");
+  wrap.appendChild(cta);
+}
+
+/* Which loaded decks can drive a multiple-choice mock (KNM facts, vocab meanings). */
+function availableMocks() {
+  const out = [];
+  INB.PACKS.forEach((p) => {
+    if (p.part !== "knm" && p.part !== "lezen") return;   // MC-friendly parts only
+    const dk = decks.find((d) => d.name === p.deck);
+    if (dk && dk.cards.length >= 4) out.push({ pack: p, deck: dk });
+  });
+  return out;
 }
 function renderExamStage(wrap, exam, level) {
   const ov = document.createElement("div");
@@ -698,6 +730,114 @@ async function renderProgress() {
 }
 function escapeHtml(s) {
   return String(s || "").replace(/[&<>"]/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[m]));
+}
+
+/* ---------- Mock exam (timed multiple-choice) ---------- */
+const PASS_RATIO = 0.6; // practice pass mark (KNM's real bar; a sensible target elsewhere)
+
+function showExamScreen(mode) {
+  $$(".screen").forEach((s) => s.classList.remove("active"));
+  $("#scr-exam").classList.add("active");
+  $$("header nav button").forEach((b) => b.classList.remove("active"));
+  $("#examSetup").hidden = mode !== "setup";
+  $("#examQuiz").hidden = mode !== "quiz";
+  $("#examResult").hidden = mode !== "result";
+}
+function renderExamSetup() {
+  showExamScreen("setup");
+  const el = $("#examSetup");
+  const mocks = availableMocks();
+  if (!mocks.length) {
+    el.innerHTML = '<h2>Mock exam</h2><div class="empty"><div class="big">🎯</div>Add a KNM or vocabulary pack in Learn first, then come back for a timed mock.</div>';
+    return;
+  }
+  el.innerHTML =
+    '<h2>Mock exam</h2><p class="muted">Pick a part. Timed, multiple-choice, no hints — like the real thing. Your study schedule stays untouched.</p>' +
+    mocks.map((m, idx) => {
+      const count = mockCount(m);
+      const secs = count * 30;
+      const need = Math.ceil(count * PASS_RATIO);
+      return `<div class="pack"><div class="pack-hd"><span class="pico">${m.pack.icon}</span>
+          <div style="min-width:0"><div class="ti">${m.pack.title}</div>
+            <div class="bl">${count} questions · ${Math.round(secs / 60)} min · pass ${need}/${count}</div></div></div>
+        <div class="pack-ft"><span class="meta"></span><button class="btn small" data-i="${idx}">▶ Start</button></div></div>`;
+    }).join("");
+  el.querySelectorAll("button[data-i]").forEach((b) => (b.onclick = () => startMock(mocks[+b.dataset.i])));
+}
+function mockCount(m) {
+  const target = m.pack.part === "knm" ? 30 : 20;
+  return Math.min(target, m.deck.cards.length);
+}
+function startMock(m) {
+  const deck = m.deck;
+  const count = mockCount(m);
+  const pool = shuffle(deck.cards.slice()).slice(0, count);
+  const qs = pool.map((card) => {
+    const others = shuffle(deck.cards.filter((c) => c.id !== card.id && c.trans !== card.trans));
+    const seen = new Set([card.trans]);
+    const distract = [];
+    for (const o of others) { if (!seen.has(o.trans)) { seen.add(o.trans); distract.push(o.trans); } if (distract.length === 3) break; }
+    return { prompt: card.word, correct: card.trans, options: shuffle([card.trans, ...distract]), answer: null };
+  });
+  exam = { pack: m.pack, qs, i: 0, count, need: Math.ceil(count * PASS_RATIO), endAt: Date.now() + count * 30 * 1000, timer: null };
+  showExamScreen("quiz");
+  exam.timer = setInterval(tickExam, 1000);
+  renderExamQuestion();
+}
+function renderExamQuestion() {
+  const q = exam.qs[exam.i];
+  const box = $("#examQuiz");
+  box.innerHTML =
+    `<div class="qhead"><button class="btn ghost small" id="examExit">← Exit</button>
+       <span class="pill grey">${exam.i + 1} / ${exam.count}</span>
+       <span class="exam-timer" id="examTimer">--:--</span></div>
+     <div class="qprompt">${escapeHtml(q.prompt)}</div>
+     <div class="opts">${q.options.map((o, i) => `<button class="opt" data-i="${i}">${escapeHtml(o)}</button>`).join("")}</div>`;
+  box.querySelector("#examExit").onclick = () => exitExam();
+  box.querySelectorAll(".opt").forEach((b) => (b.onclick = () => {
+    exam.qs[exam.i].answer = exam.qs[exam.i].options[+b.dataset.i];
+    exam.i += 1;
+    if (exam.i < exam.count) renderExamQuestion(); else finishMock();
+  }));
+  updateExamTimer();
+}
+function updateExamTimer() {
+  const el = $("#examTimer");
+  if (!el) return;
+  const left = Math.max(0, Math.round((exam.endAt - Date.now()) / 1000));
+  el.textContent = Math.floor(left / 60) + ":" + String(left % 60).padStart(2, "0");
+  el.classList.toggle("low", left <= 60);
+}
+function tickExam() {
+  updateExamTimer();
+  if (Date.now() >= exam.endAt) finishMock();
+}
+function finishMock() {
+  if (exam.timer) { clearInterval(exam.timer); exam.timer = null; }
+  const score = exam.qs.filter((q) => q.answer === q.correct).length;
+  const pass = score >= exam.need;
+  const misses = exam.qs.filter((q) => q.answer !== q.correct);
+  showExamScreen("result");
+  $("#examResult").innerHTML =
+    `<div class="result-hero">
+       <div class="result-score">${score}<span style="font-size:22px;color:var(--muted)">/${exam.count}</span></div>
+       <div class="result-badge ${pass ? "pass" : "fail"}">${pass ? "✓ Passed (practice)" : "Keep practising"}</div>
+       <p class="muted" style="margin-top:8px">Practice pass mark: ${exam.need}/${exam.count} (60%).</p>
+     </div>` +
+    (misses.length
+      ? `<h2 style="margin-top:8px">Review (${misses.length})</h2>` +
+        misses.map((q) => `<div class="miss"><div class="mq">${escapeHtml(q.prompt)}</div>
+           <div class="my">You: ${escapeHtml(q.answer || "— (skipped / time up)")}</div>
+           <div class="mc">Correct: ${escapeHtml(q.correct)}</div></div>`).join("")
+      : '<div class="empty" style="padding:22px"><div class="big">🎉</div>Perfect score — mooi zo!</div>') +
+    `<div class="row" style="margin-top:16px"><button class="btn" id="examAgain">Try again</button><button class="btn ghost" id="examDone">Done</button></div>`;
+  $("#examAgain").onclick = () => { const dk = decks.find((d) => d.name === exam.pack.deck); startMock({ pack: exam.pack, deck: dk }); };
+  $("#examDone").onclick = () => { exam = null; go("learn"); };
+}
+function exitExam() {
+  if (exam && exam.timer) { clearInterval(exam.timer); exam.timer = null; }
+  exam = null;
+  go("learn");
 }
 
 /* ---------- Settings / theme ---------- */
