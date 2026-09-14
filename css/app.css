@@ -209,6 +209,19 @@ a{color:var(--a1)}
 .pack-ft .meta{font-size:12px;color:var(--muted)}
 .pack-ft button{margin-left:auto;flex:none}
 
+/* Card browser rows */
+.deck .dtap:hover .name{color:var(--a1)}
+.crow{display:flex;align-items:center;gap:10px;padding:11px 0;border-top:1px solid var(--line-2)}
+.crow:first-child{border-top:0}
+.crow .cw{font-weight:800;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.crow .ct{font-size:13px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* Backup nudge banner */
+.nudge{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--a-soft);
+  border:1px solid var(--line);border-radius:14px;padding:12px 14px;margin-bottom:12px;font-size:13px}
+.nudge > span{min-width:0;flex:1 1 220px}
+.nudge button{flex:none;margin-left:auto}
+
 /* Mock exam */
 #scr-exam .qhead{display:flex;align-items:center;gap:10px;margin-bottom:6px}
 .exam-timer{margin-left:auto;font-weight:800;font-variant-numeric:tabular-nums;

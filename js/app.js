@@ -19,7 +19,10 @@ const CUR = window.VlotCurriculum;
 const INB = window.VlotInburgering;
 
 let decks = [];
-let currentDeckId = null;   // add-card
+let currentDeckId = null;   // add-card / card browser
+let editingCardId = null;   // set when the add screen is editing an existing card
+let addReturn = "decks";    // where the add screen's ← Back goes
+let lastBackup = 0;         // ms timestamp of the last full backup
 let chosenImage = null;     // add-card selected image
 let session = null;         // { deckId, queue:[cardId] }
 let studyStats = { days: {} }; // { days: { "YYYY-MM-DD": { r, again } } } — for the Progress screen
@@ -145,6 +148,7 @@ function go(name) {
   if (name === "study") renderStudyPick();
   if (name === "progress") renderProgress();
   if (name === "exam") renderExamSetup();
+  if (name === "cards") renderCards();
 }
 $$("header nav button").forEach((b) => b.addEventListener("click", () => go(b.dataset.go)));
 
@@ -164,18 +168,20 @@ async function renderDecks() {
     const div = document.createElement("div");
     div.className = "deck";
     div.innerHTML =
-      `<div style="min-width:0"><div class="name"></div><div class="meta">${d.cards.length} card${d.cards.length === 1 ? "" : "s"}</div></div>
+      `<div class="dtap" data-act="browse" style="min-width:0;cursor:pointer"><div class="name"></div><div class="meta">${d.cards.length} card${d.cards.length === 1 ? "" : "s"} · tap to edit ›</div></div>
        <div class="spacer"></div>
        ${due > 0 ? `<span class="pill">${due} due</span>` : '<span class="pill grey">✓ done</span>'}
        <button class="btn small" data-act="add">+ Card</button>
        <button class="btn ghost small icon" data-act="export" title="Export">⬇️</button>
        <button class="btn ghost small icon" data-act="del" title="Delete">🗑️</button>`;
     div.querySelector(".name").textContent = d.name;
-    div.querySelector('[data-act=add]').onclick = () => openAdd(d.id);
+    div.querySelector('[data-act=browse]').onclick = () => openDeckCards(d.id);
+    div.querySelector('[data-act=add]').onclick = () => openAdd(d.id, null, "decks");
     div.querySelector('[data-act=export]').onclick = () => exportDeck(d);
     div.querySelector('[data-act=del]').onclick = () => removeDeck(d);
     el.appendChild(div);
   });
+  renderBackupNudge();
 }
 $("#addDeck").onclick = async () => {
   const name = $("#newDeckName").value.trim();
@@ -191,20 +197,75 @@ async function removeDeck(d) {
   await DB.deleteDeck(d.id); renderDecks(); toast("Deck deleted.");
 }
 
-/* ---------- Add-card screen ---------- */
-function openAdd(deckId) {
-  currentDeckId = deckId; chosenImage = null;
+/* ---------- Card browser (view / edit / delete) ---------- */
+function openDeckCards(deckId) { currentDeckId = deckId; go("cards"); }
+
+async function renderCards() {
+  await refresh();
+  const d = decks.find((x) => x.id === currentDeckId);
+  if (!d) { go("decks"); return; }
+  $("#cardsDeckLabel").textContent = d.name;
+  const list = $("#cardList");
+  if (!d.cards.length) {
+    list.innerHTML = '<div class="empty"><div class="big">🌱</div>No cards yet. Add your first one.</div>';
+    return;
+  }
+  list.innerHTML = "";
+  d.cards.forEach((c) => {
+    const row = document.createElement("div");
+    row.className = "crow";
+    row.innerHTML =
+      `<div style="min-width:0"><div class="cw"></div><div class="ct"></div></div>
+       <div class="spacer"></div>
+       <button class="btn ghost small icon" data-act="edit" title="Edit">✏️</button>
+       <button class="btn ghost small icon" data-act="del" title="Delete">🗑️</button>`;
+    row.querySelector(".cw").textContent = c.word + (c.article ? " (" + c.article + ")" : "");
+    row.querySelector(".ct").textContent = c.trans;
+    row.querySelector('[data-act=edit]').onclick = () => openAdd(d.id, c.id, "cards");
+    row.querySelector('[data-act=del]').onclick = () => deleteCard(d.id, c.id);
+    list.appendChild(row);
+  });
+}
+async function deleteCard(deckId, cardId) {
+  const d = decks.find((x) => x.id === deckId);
+  const c = d.cards.find((x) => x.id === cardId);
+  if (!c || !confirm(`Delete the card "${c.word}"? This can't be undone.`)) return;
+  d.cards = d.cards.filter((x) => x.id !== cardId);
+  await DB.putDeck(d);
+  await refresh();
+  renderCards();
+  toast("Card deleted.");
+}
+$("#cardsBack").onclick = () => go("decks");
+$("#cardsAdd").onclick = () => openAdd(currentDeckId, null, "cards");
+
+/* ---------- Add / edit card screen ---------- */
+function openAdd(deckId, cardId, ret) {
+  currentDeckId = deckId; chosenImage = null; editingCardId = cardId || null;
+  addReturn = ret || "decks";
   const d = decks.find((x) => x.id === deckId);
   $("#addDeckLabel").textContent = "Deck: " + d.name;
   ["cardWord", "cardTrans", "cardCategory", "cardSentence", "cardSentenceTrans", "cardNotes", "imgQuery"].forEach((id) => { $("#" + id).value = ""; });
   $("#cardPos").value = ""; $("#cardArticle").value = "";
-  $("#imgResults").innerHTML = ""; $("#chosenWrap").hidden = true;
+  $("#imgResults").innerHTML = ""; $("#chosenWrap").hidden = true; $("#articleWrap").hidden = true;
+  if (editingCardId) {
+    const c = d.cards.find((x) => x.id === editingCardId);
+    $("#cardWord").value = c.word || ""; $("#cardTrans").value = c.trans || "";
+    $("#cardCategory").value = c.category || ""; $("#cardSentence").value = c.sentence || "";
+    $("#cardSentenceTrans").value = c.sentenceTrans || ""; $("#cardNotes").value = c.notes || "";
+    $("#cardPos").value = c.pos || ""; $("#cardArticle").value = c.article || "";
+    $("#articleWrap").hidden = c.pos !== "noun";
+    if (c.img) { chosenImage = c.img; $("#chosenImg").src = c.img; $("#chosenWrap").hidden = false; }
+    $("#addTitle").textContent = "Edit card"; $("#saveCard").textContent = "Save changes";
+  } else {
+    $("#addTitle").textContent = "New card"; $("#saveCard").textContent = "Save card";
+  }
   renderCategoryChips();
   updateCardCount();
   go("add");
   $("#cardWord").focus();
 }
-$("#backToDecks").onclick = () => go("decks");
+$("#backToDecks").onclick = () => go(addReturn);
 // (image search field is left blank on purpose — type your own query)
 
 function renderCategoryChips() {
@@ -257,6 +318,24 @@ $("#saveCard").onclick = async () => {
   const trans = $("#cardTrans").value.trim();
   if (!word || !trans) { toast("Fill in the word and translation."); return; }
   const d = decks.find((x) => x.id === currentDeckId);
+
+  if (editingCardId) {
+    // Update content only — keep scheduling, freqRank, level, source, created.
+    const c = d.cards.find((x) => x.id === editingCardId);
+    c.word = word; c.trans = trans; c.img = chosenImage;
+    c.sentence = $("#cardSentence").value.trim();
+    c.sentenceTrans = $("#cardSentenceTrans").value.trim();
+    c.category = $("#cardCategory").value.trim();
+    c.pos = $("#cardPos").value;
+    c.article = $("#cardPos").value === "noun" ? $("#cardArticle").value : "";
+    c.notes = $("#cardNotes").value.trim();
+    await DB.putDeck(d);
+    editingCardId = null;
+    toast("Card updated ✅");
+    go("cards");
+    return;
+  }
+
   const card = migrateCard({
     id: uid(), word, trans, img: chosenImage,
     created: Date.now(),
@@ -305,6 +384,66 @@ $("#importFile").onchange = async (e) => {
   } catch (err) { toast("Invalid file."); }
   e.target.value = "";
 };
+
+/* ---------- Backup / Restore (whole app) ---------- */
+async function backupAll() {
+  await refresh();
+  const total = decks.reduce((s, d) => s + d.cards.length, 0);
+  if (!total) { toast("Nothing to back up yet."); return; }
+  const snapshot = { app: "de-of-het", version: 1, exportedAt: new Date().toISOString(), decks, studyStats };
+  const blob = new Blob([JSON.stringify(snapshot)], { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "de-of-het-backup-" + dayKey() + ".json";
+  a.click(); URL.revokeObjectURL(a.href);
+  lastBackup = Date.now();
+  await DB.setSetting("lastBackup", lastBackup);
+  updateBackupInfo();
+  toast(`Backup saved ✅ (${decks.length} deck${decks.length === 1 ? "" : "s"}, ${total} cards)`);
+}
+async function restoreBackup(file) {
+  try {
+    const data = JSON.parse(await file.text());
+    const imported = Array.isArray(data.decks) ? data.decks : (Array.isArray(data) ? data : null);
+    if (!imported) throw new Error("bad");
+    for (const raw of imported) {
+      if (!raw || !Array.isArray(raw.cards)) continue;
+      const d = migrateDeck(raw);
+      d.id = uid(); // add as new — never overwrite existing decks
+      await DB.putDeck(d);
+    }
+    if (data.studyStats && data.studyStats.days) {
+      Object.entries(data.studyStats.days).forEach(([k, v]) => { if (!studyStats.days[k]) studyStats.days[k] = v; });
+      await DB.setSetting("studyStats", studyStats);
+    }
+    await refresh(); await ensureCurriculum();
+    renderDecks();
+    toast(`Backup restored ✅ (${imported.length} deck${imported.length === 1 ? "" : "s"})`);
+  } catch (err) { toast("That file isn't a valid backup."); }
+}
+function updateBackupInfo() {
+  const el = $("#backupInfo");
+  if (!el) return;
+  el.textContent = lastBackup
+    ? "Last backup: " + new Date(lastBackup).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })
+    : "No backup yet — your cards live only on this device.";
+}
+function renderBackupNudge() {
+  const el = $("#backupNudge");
+  if (!el) return;
+  const total = decks.reduce((s, d) => s + d.cards.length, 0);
+  const stale = !lastBackup || (Date.now() - lastBackup) > 14 * 86400000;
+  if (total >= 10 && stale) {
+    el.hidden = false;
+    el.innerHTML = '<span>🛟 Your cards live only on this device. Back them up so a lost phone doesn\'t mean losing everything.</span><button class="btn small" id="nudgeBackup">Back up</button>';
+    $("#nudgeBackup").onclick = () => backupAll();
+  } else {
+    el.hidden = true; el.innerHTML = "";
+  }
+}
+$("#backupBtn").onclick = () => backupAll();
+$("#restoreBtn").onclick = () => $("#restoreFile").click();
+$("#restoreFile").onchange = async (e) => { const f = e.target.files[0]; if (f) await restoreBackup(f); e.target.value = ""; };
 
 /* ---------- Study ---------- */
 async function renderStudyPick() {
@@ -853,7 +992,7 @@ function applyMode(mode) {
   if (mode === "system") document.documentElement.removeAttribute("data-theme");
   else document.documentElement.setAttribute("data-theme", mode);
 }
-$("#settingsBtn").onclick = () => $("#settingsSheet").classList.add("open");
+$("#settingsBtn").onclick = () => { updateBackupInfo(); $("#settingsSheet").classList.add("open"); };
 $("#closeSettings").onclick = () => $("#settingsSheet").classList.remove("open");
 $("#settingsSheet").addEventListener("click", (e) => { if (e.target.id === "settingsSheet") e.currentTarget.classList.remove("open"); });
 $$(".sw").forEach((b) => b.onclick = async () => {
@@ -875,6 +1014,8 @@ $$("#modeSeg button").forEach((b) => b.onclick = async () => {
   await applyStoredTheme();
   const savedStats = await DB.getSetting("studyStats", { days: {} });
   studyStats = (savedStats && savedStats.days) ? savedStats : { days: {} };
+  lastBackup = await DB.getSetting("lastBackup", 0);
+  updateBackupInfo();
   await refresh();
   await ensureCurriculum();   // backfill ranks/levels for existing cards
   await renderDecks();

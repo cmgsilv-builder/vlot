@@ -39,6 +39,7 @@
         <input type="file" id="importFile" accept="application/json" hidden>
       </div>
     </div>
+    <div class="nudge" id="backupNudge" hidden></div>
     <div id="deckList"></div>
   </section>
 
@@ -53,7 +54,7 @@
     </div>
 
     <div class="card">
-      <h2>New card</h2>
+      <h2 id="addTitle">New card</h2>
 
       <label>Dutch word</label>
       <input type="text" id="cardWord" placeholder="e.g. appel">
@@ -182,6 +183,25 @@
     <div class="card" id="examQuiz" hidden></div>
     <div class="card" id="examResult" hidden></div>
   </section>
+
+  <!-- CARD BROWSER -->
+  <section id="scr-cards" class="screen">
+    <div class="card">
+      <div class="row">
+        <button class="btn ghost small" id="cardsBack">← Decks</button>
+        <div class="spacer"></div>
+        <span class="muted" id="cardsDeckLabel"></span>
+      </div>
+    </div>
+    <div class="card">
+      <div class="row" style="margin-bottom:8px">
+        <h2 style="margin:0">Cards</h2>
+        <div class="spacer"></div>
+        <button class="btn small" id="cardsAdd">+ Add card</button>
+      </div>
+      <div id="cardList"></div>
+    </div>
+  </section>
 </main>
 
 <!-- Settings sheet -->
@@ -201,7 +221,14 @@
       <button data-mode="light">Light</button>
       <button data-mode="dark">Dark</button>
     </div>
-    <div class="hint" style="margin-top:16px"><b>De of Het?</b> is free, offline and stores everything on this device. Scheduling uses <b>FSRS</b>. Export decks to back up or move devices.</div>
+    <label style="margin-top:14px">Your data</label>
+    <div class="row">
+      <button class="btn ghost small" id="backupBtn">⬇️ Back up everything</button>
+      <button class="btn ghost small" id="restoreBtn">⬆️ Restore backup</button>
+      <input type="file" id="restoreFile" accept="application/json" hidden>
+    </div>
+    <div class="hint" id="backupInfo"></div>
+    <div class="hint" style="margin-top:16px"><b>De of Het?</b> is free, offline and stores everything on this device. Scheduling uses <b>FSRS</b>. Back up regularly — your cards live only here.</div>
   </div>
 </div>
 
