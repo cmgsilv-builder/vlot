@@ -1,7 +1,7 @@
 "use strict";
 /* Vlot service worker — cache the app shell so it opens offline.
    Bump CACHE when you change any shell file. */
-const CACHE = "vlot-shell-v22";
+const CACHE = "vlot-shell-v23";
 const SHELL = [
   ".",
   "index.html",

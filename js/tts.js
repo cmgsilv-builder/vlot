@@ -1,14 +1,22 @@
 "use strict";
 /* ============================================================
    Vlot — text-to-speech
-   Primary: a real Dutch MP3 from Google's free TTS endpoint, played
-   through an <audio> element. This is reliable on iPhone/Safari, where
-   the built-in speechSynthesis voice often produces no sound at all.
-   Fallback: browser speechSynthesis (mainly desktop / offline).
-   No API key, no signup.
+
+   Reality (tested 18/09/2026): iOS Safari's built-in speechSynthesis is
+   silent on some iPhones, and every free "text→speech" HTTP endpoint
+   (Google, StreamElements, public CORS proxies) now blocks browser calls
+   (503/401). The only reliable path to audio on iPhone is a real MP3 from
+   a service that allows browser (CORS) requests — which needs a free key.
+
+   Set VOICE_KEY below to a free VoiceRSS key (https://www.voicerss.org)
+   and 🔊 will play a proper Dutch MP3 everywhere, including iPhone.
+   With no key it falls back to the browser voice (works on desktop only).
    ============================================================ */
 
-/* ---- speechSynthesis fallback (kept for offline / desktop) ---- */
+// Paste a free VoiceRSS API key here to enable reliable audio on iPhone.
+const VOICE_KEY = "";
+
+/* ---- speechSynthesis fallback (desktop / offline) ---- */
 let _voices = [];
 function loadVoices() { try { _voices = speechSynthesis.getVoices() || []; } catch (e) { _voices = []; } }
 if ("speechSynthesis" in window && window.speechSynthesis) {
@@ -16,7 +24,7 @@ if ("speechSynthesis" in window && window.speechSynthesis) {
   try { speechSynthesis.onvoiceschanged = loadVoices; } catch (e) {}
 }
 function _synth(text) {
-  if (!("speechSynthesis" in window)) return;
+  if (!("speechSynthesis" in window)) { Vlot.toast && Vlot.toast("No audio available here."); return; }
   if (!_voices.length) loadVoices();
   try { if (speechSynthesis.speaking || speechSynthesis.pending) speechSynthesis.cancel(); } catch (e) {}
   const u = new SpeechSynthesisUtterance(text);
@@ -26,11 +34,11 @@ function _synth(text) {
   try { speechSynthesis.speak(u); } catch (e) {}
 }
 
-/* ---- primary: play an MP3 file (works on iOS) ---- */
-// Google Translate TTS: free, no key. ~200 char limit per call, so we trim.
-function _ttsUrl(text) {
-  const t = text.length > 200 ? text.slice(0, 200) : text;
-  return "https://translate.google.com/translate_tts?ie=UTF-8&tl=nl&client=tw-ob&q=" + encodeURIComponent(t);
+/* ---- primary: real MP3 (works on iPhone) when a key is set ---- */
+function _voiceUrl(text) {
+  const t = text.length > 300 ? text.slice(0, 300) : text;
+  return "https://api.voicerss.org/?key=" + encodeURIComponent(VOICE_KEY) +
+    "&hl=nl-nl&v=Lotte&c=MP3&f=44khz_16bit_stereo&r=-2&src=" + encodeURIComponent(t);
 }
 let _audio = null;
 function _playFile(url) {
@@ -39,7 +47,7 @@ function _playFile(url) {
       if (!_audio) _audio = new Audio();
       _audio.onerror = () => reject(new Error("audio"));
       _audio.src = url;
-      const p = _audio.play(); // called inside the 🔊 tap → allowed on iOS
+      const p = _audio.play(); // inside the 🔊 tap → allowed on iOS
       if (p && p.then) p.then(resolve).catch(reject); else resolve();
     } catch (e) { reject(e); }
   });
@@ -47,13 +55,10 @@ function _playFile(url) {
 
 function speak(text) {
   if (!text) return;
-  // Real MP3 first (reliable everywhere, incl. iPhone); fall back to the
-  // browser's own voice only if that fails (e.g. offline).
-  _playFile(_ttsUrl(text)).catch(() => _synth(text));
+  if (VOICE_KEY) { _playFile(_voiceUrl(text)).catch(() => _synth(text)); }
+  else { _synth(text); }
 }
 
-// Audio playback is always available (online Google voice), so the old
-// "install a Dutch voice" nudge is no longer needed.
-function hasDutchVoice() { return true; }
+function hasDutchVoice() { return !!VOICE_KEY || _voices.some((v) => v.lang && v.lang.toLowerCase().startsWith("nl")); }
 
 window.VlotTTS = { speak, hasDutchVoice };
