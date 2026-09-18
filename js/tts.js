@@ -1,57 +1,59 @@
 "use strict";
 /* ============================================================
-   Vlot — text-to-speech (free, browser-native Dutch voice)
+   Vlot — text-to-speech
+   Primary: a real Dutch MP3 from Google's free TTS endpoint, played
+   through an <audio> element. This is reliable on iPhone/Safari, where
+   the built-in speechSynthesis voice often produces no sound at all.
+   Fallback: browser speechSynthesis (mainly desktop / offline).
+   No API key, no signup.
    ============================================================ */
+
+/* ---- speechSynthesis fallback (kept for offline / desktop) ---- */
 let _voices = [];
-let _unlocked = false;
-const _isIOS = /iP(hone|ad|od)/.test(navigator.userAgent) ||
-  (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
 function loadVoices() { try { _voices = speechSynthesis.getVoices() || []; } catch (e) { _voices = []; } }
 if ("speechSynthesis" in window && window.speechSynthesis) {
   loadVoices();
   try { speechSynthesis.onvoiceschanged = loadVoices; } catch (e) {}
 }
-
-/* iOS won't make a sound until speechSynthesis has been kicked off from a real
-   user gesture at least once — and in home-screen (standalone) mode it's even
-   stricter. Prime the engine on the first tap with a real (near-silent, single
-   space) utterance at full volume; a volume:0 primer does NOT unlock audio. */
-function _unlock() {
-  if (_unlocked || !("speechSynthesis" in window)) return;
-  _unlocked = true;
-  try {
-    loadVoices();
-    const u = new SpeechSynthesisUtterance(" ");
-    u.volume = 1; u.rate = 1;
-    speechSynthesis.speak(u);
-    setTimeout(() => { try { if (speechSynthesis.paused) speechSynthesis.resume(); } catch (e) {} }, 40);
-  } catch (e) {}
+function _synth(text) {
+  if (!("speechSynthesis" in window)) return;
+  if (!_voices.length) loadVoices();
+  try { if (speechSynthesis.speaking || speechSynthesis.pending) speechSynthesis.cancel(); } catch (e) {}
+  const u = new SpeechSynthesisUtterance(text);
+  const nl = _voices.find((v) => v.lang && v.lang.toLowerCase().startsWith("nl"));
+  if (nl) { u.voice = nl; u.lang = nl.lang; }
+  u.rate = 0.95;
+  try { speechSynthesis.speak(u); } catch (e) {}
 }
-["touchend", "pointerdown", "click"].forEach((ev) =>
-  document.addEventListener(ev, _unlock, { once: true, passive: true, capture: true })
-);
+
+/* ---- primary: play an MP3 file (works on iOS) ---- */
+// Google Translate TTS: free, no key. ~200 char limit per call, so we trim.
+function _ttsUrl(text) {
+  const t = text.length > 200 ? text.slice(0, 200) : text;
+  return "https://translate.google.com/translate_tts?ie=UTF-8&tl=nl&client=tw-ob&q=" + encodeURIComponent(t);
+}
+let _audio = null;
+function _playFile(url) {
+  return new Promise((resolve, reject) => {
+    try {
+      if (!_audio) _audio = new Audio();
+      _audio.onerror = () => reject(new Error("audio"));
+      _audio.src = url;
+      const p = _audio.play(); // called inside the 🔊 tap → allowed on iOS
+      if (p && p.then) p.then(resolve).catch(reject); else resolve();
+    } catch (e) { reject(e); }
+  });
+}
 
 function speak(text) {
   if (!text) return;
-  if (!("speechSynthesis" in window)) { Vlot.toast && Vlot.toast("No speech support in this browser."); return; }
-  if (!_unlocked) _unlock();
-  // iOS Safari hands voices over lazily — grab them again if we have none yet.
-  if (!_voices.length) loadVoices();
-  // On iOS, calling cancel() before speak() can silently break the queue in
-  // standalone mode. Only cancel on other platforms (to stop overlap).
-  if (!_isIOS) { try { if (speechSynthesis.speaking || speechSynthesis.pending) speechSynthesis.cancel(); } catch (e) {} }
-  const u = new SpeechSynthesisUtterance(text);
-  const nl = _voices.find((v) => v.lang && v.lang.toLowerCase().startsWith("nl"));
-  // Only force nl-NL when a Dutch voice exists; otherwise leave defaults so it
-  // still speaks (better an English voice than dead silence).
-  if (nl) { u.voice = nl; u.lang = nl.lang; } else if (!_isIOS) { u.lang = "nl-NL"; }
-  u.rate = 0.95; u.volume = 1;
-  try {
-    speechSynthesis.speak(u);
-    // iOS sometimes parks the queue in a paused state — nudge it awake.
-    setTimeout(() => { try { if (speechSynthesis.paused) speechSynthesis.resume(); } catch (e) {} }, 60);
-  } catch (e) { Vlot.toast && Vlot.toast("Couldn't play audio here."); }
+  // Real MP3 first (reliable everywhere, incl. iPhone); fall back to the
+  // browser's own voice only if that fails (e.g. offline).
+  _playFile(_ttsUrl(text)).catch(() => _synth(text));
 }
-function hasDutchVoice() { return _voices.some((v) => v.lang && v.lang.toLowerCase().startsWith("nl")); }
+
+// Audio playback is always available (online Google voice), so the old
+// "install a Dutch voice" nudge is no longer needed.
+function hasDutchVoice() { return true; }
 
 window.VlotTTS = { speak, hasDutchVoice };
