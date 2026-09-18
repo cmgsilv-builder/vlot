@@ -54,18 +54,31 @@ function practice(target, cb = {}) {
   const R = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!R) { cb.onError && cb.onError("unsupported"); return null; }
   const handle = { stop() {} };
+  let finished = false;      // guard: fire onEnd exactly once
+  let watchdog = null;       // safety timer so it can never listen forever
+
+  function cleanup() { if (watchdog) { clearTimeout(watchdog); watchdog = null; } }
+  function finish() {
+    if (finished) return;
+    finished = true;
+    cleanup();
+    cb.onEnd && cb.onEnd();
+  }
 
   function run() {
     let rec;
-    try { rec = new R(); } catch (e) { cb.onError && cb.onError("init"); return; }
+    try { rec = new R(); } catch (e) { cb.onError && cb.onError("init"); finish(); return; }
     rec.lang = "nl-NL";
     rec.interimResults = false;
     rec.maxAlternatives = 4;
     rec.continuous = false;
-    handle.stop = () => { try { rec.stop(); } catch (e) {} };
+    // Hard stop: abort() ends immediately even when iOS Safari ignores stop().
+    handle.stop = () => { try { rec.abort(); } catch (e) { try { rec.stop(); } catch (e2) {} } finish(); };
+    // If nothing has come back in 8s, kill it — iOS sometimes never fires onend.
+    watchdog = setTimeout(() => { try { rec.abort(); } catch (e) {} finish(); }, 8000);
     rec.onstart = () => cb.onStart && cb.onStart();
-    rec.onerror = (e) => cb.onError && cb.onError(e.error || "error");
-    rec.onend = () => cb.onEnd && cb.onEnd();
+    rec.onerror = (e) => { cb.onError && cb.onError(e.error || "error"); finish(); };
+    rec.onend = () => finish();
     rec.onresult = (e) => {
       const alts = e.results && e.results[0] ? e.results[0] : [];
       // Score the recogniser's most-confident guess (alts[0]), not the best of
@@ -74,7 +87,7 @@ function practice(target, cb = {}) {
       const heard = alts[0] ? alts[0].transcript : "";
       cb.onResult && cb.onResult({ score: scoreMatch(target, heard), heard });
     };
-    try { rec.start(); } catch (e) { cb.onError && cb.onError("start"); }
+    try { rec.start(); } catch (e) { cb.onError && cb.onError("start"); finish(); }
   }
 
   // Force the mic permission prompt up front for clear, early errors.
