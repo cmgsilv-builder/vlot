@@ -71,6 +71,12 @@
             <option value="verb">verb</option>
             <option value="adjective">adjective</option>
             <option value="adverb">adverb</option>
+            <option value="preposition">preposition</option>
+            <option value="conjunction">conjunction</option>
+            <option value="pronoun">pronoun</option>
+            <option value="article">article</option>
+            <option value="numeral">numeral</option>
+            <option value="interjection">interjection</option>
             <option value="other">other</option>
           </select>
         </div>
@@ -84,10 +90,8 @@
         </div>
       </div>
 
-      <label>Category / topic <span class="muted">(pick or type)</span></label>
-      <input type="text" id="cardCategory" list="catList" placeholder="e.g. Food">
-      <datalist id="catList"></datalist>
-      <div class="chips" id="catChips"></div>
+      <label>Category / topic</label>
+      <select id="cardCategory"></select>
 
       <label>Example sentence (Dutch)</label>
       <input type="text" id="cardSentence" placeholder="e.g. Ik eet een appel.">

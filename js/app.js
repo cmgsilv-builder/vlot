@@ -215,12 +215,11 @@ async function renderCards() {
     const row = document.createElement("div");
     row.className = "crow";
     row.innerHTML =
-      `<div style="min-width:0"><div class="cw"></div><div class="ct"></div></div>
+      `<div style="min-width:0"><div class="cw"></div></div>
        <div class="spacer"></div>
        <button class="btn ghost small icon" data-act="edit" title="Edit">✏️</button>
        <button class="btn ghost small icon" data-act="del" title="Delete">🗑️</button>`;
     row.querySelector(".cw").textContent = c.word + (c.article ? " (" + c.article + ")" : "");
-    row.querySelector(".ct").textContent = c.trans;
     row.querySelector('[data-act=edit]').onclick = () => openAdd(d.id, c.id, "cards");
     row.querySelector('[data-act=del]').onclick = () => deleteCard(d.id, c.id);
     list.appendChild(row);
@@ -245,13 +244,13 @@ function openAdd(deckId, cardId, ret) {
   addReturn = ret || "decks";
   const d = decks.find((x) => x.id === deckId);
   $("#addDeckLabel").textContent = "Deck: " + d.name;
-  ["cardWord", "cardTrans", "cardCategory", "cardSentence", "cardSentenceTrans", "cardNotes", "imgQuery"].forEach((id) => { $("#" + id).value = ""; });
+  ["cardWord", "cardTrans", "cardSentence", "cardSentenceTrans", "cardNotes", "imgQuery"].forEach((id) => { $("#" + id).value = ""; });
   $("#cardPos").value = ""; $("#cardArticle").value = "";
   $("#imgResults").innerHTML = ""; $("#chosenWrap").hidden = true; $("#articleWrap").hidden = true;
   if (editingCardId) {
     const c = d.cards.find((x) => x.id === editingCardId);
     $("#cardWord").value = c.word || ""; $("#cardTrans").value = c.trans || "";
-    $("#cardCategory").value = c.category || ""; $("#cardSentence").value = c.sentence || "";
+    $("#cardSentence").value = c.sentence || "";
     $("#cardSentenceTrans").value = c.sentenceTrans || ""; $("#cardNotes").value = c.notes || "";
     $("#cardPos").value = c.pos || ""; $("#cardArticle").value = c.article || "";
     $("#articleWrap").hidden = c.pos !== "noun";
@@ -260,7 +259,8 @@ function openAdd(deckId, cardId, ret) {
   } else {
     $("#addTitle").textContent = "New card"; $("#saveCard").textContent = "Save card";
   }
-  renderCategoryChips();
+  const editCat = editingCardId ? (d.cards.find((x) => x.id === editingCardId) || {}).category : "";
+  populateCategories(editCat || "");
   updateCardCount();
   go("add");
   $("#cardWord").focus();
@@ -268,18 +268,26 @@ function openAdd(deckId, cardId, ret) {
 $("#backToDecks").onclick = () => go(addReturn);
 // (image search field is left blank on purpose — type your own query)
 
-function renderCategoryChips() {
-  const wrap = $("#catChips");
-  const cats = allCategories();
-  const dl = $("#catList");
-  dl.innerHTML = cats.map((c) => `<option value="${c.replace(/"/g, "&quot;")}">`).join("");
-  wrap.innerHTML = "";
-  cats.slice(0, 12).forEach((c) => {
-    const s = document.createElement("span");
-    s.className = "chip"; s.textContent = c;
-    s.onclick = () => { $("#cardCategory").value = c; };
-    wrap.appendChild(s);
-  });
+// A ready-made list of common topics, merged with any categories already used
+// in your decks (and whatever the card being edited already has).
+const PRESET_CATEGORIES = [
+  "People & family", "Food & drink", "Home & furniture", "Clothing",
+  "Body & health", "Work & school", "Travel & transport", "Nature & weather",
+  "Animals", "Time & dates", "Numbers", "Colors", "Emotions & feelings",
+  "Places", "Shopping & money", "Technology", "Hobbies & sports",
+  "Verbs (actions)", "Grammar words", "Other",
+];
+function populateCategories(selected) {
+  const sel = $("#cardCategory");
+  const set = new Set(PRESET_CATEGORIES);
+  allCategories().forEach((c) => set.add(c));
+  if (selected) set.add(selected);
+  const cats = Array.from(set).sort((a, b) => a.localeCompare(b));
+  sel.innerHTML = '<option value="">—</option>' +
+    cats.map((c) => `<option value="${c.replace(/"/g, "&quot;")}"></option>`).join("");
+  // fill option text safely (avoid HTML injection from custom names)
+  Array.from(sel.options).forEach((o) => { if (o.value) o.textContent = o.value; });
+  sel.value = selected || "";
 }
 function updateCardCount() {
   const d = decks.find((x) => x.id === currentDeckId);
@@ -354,7 +362,7 @@ $("#saveCard").onclick = async () => {
   ["cardWord", "cardTrans", "cardSentence", "cardSentenceTrans", "cardNotes", "imgQuery"].forEach((id) => { $("#" + id).value = ""; });
   $("#cardPos").value = ""; $("#cardArticle").value = "";
   $("#imgResults").innerHTML = ""; $("#chosenWrap").hidden = true; chosenImage = null;
-  renderCategoryChips(); updateCardCount();
+  populateCategories($("#cardCategory").value); updateCardCount();
   $("#cardWord").focus();
 };
 $("#cardPos").addEventListener("change", () => {
@@ -587,6 +595,12 @@ function showFront(card) {
   const word = document.createElement("div"); word.className = "word";
   word.append(document.createTextNode(card.word), spkBtn(card.word));
   f.appendChild(word);
+  // Dutch example sentence up front (no English — that stays on the back).
+  if (card.sentence) {
+    const s = document.createElement("div"); s.className = "sentence";
+    s.append(document.createTextNode("“" + card.sentence + "”"), spkBtn(card.sentence));
+    f.appendChild(s);
+  }
   const sp = makeSpeak(card.word, "Say it");
   if (sp) f.appendChild(sp);
   const show = document.createElement("button"); show.className = "btn"; show.textContent = "Show answer";

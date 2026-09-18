@@ -34,11 +34,16 @@ function _levenshtein(a, b) {
 }
 
 // 0..100 similarity between what was heard and the target text.
+// A short word can share ~20% of its letters with almost anything by chance,
+// so we subtract that "coincidence floor" and rescale — a real match stays
+// high, but gibberish lands near 0 instead of a flattering ~50%.
 function scoreMatch(target, heard) {
   const a = _normalize(target), b = _normalize(heard);
   if (!a || !b) return 0;
   const d = _levenshtein(a, b);
-  return Math.max(0, Math.round((1 - d / Math.max(a.length, b.length)) * 100));
+  const raw = 1 - d / Math.max(a.length, b.length); // 0..1 letter overlap
+  const adj = (raw - 0.2) / 0.8;                     // 0.2 overlap -> 0
+  return Math.max(0, Math.min(100, Math.round(adj * 100)));
 }
 
 /* Start one recognition attempt for `target`.
@@ -63,12 +68,11 @@ function practice(target, cb = {}) {
     rec.onend = () => cb.onEnd && cb.onEnd();
     rec.onresult = (e) => {
       const alts = e.results && e.results[0] ? e.results[0] : [];
-      let best = 0, heard = "";
-      for (let i = 0; i < alts.length; i++) {
-        const s = scoreMatch(target, alts[i].transcript);
-        if (s >= best) { best = s; heard = alts[i].transcript; }
-      }
-      cb.onResult && cb.onResult({ score: best, heard });
+      // Score the recogniser's most-confident guess (alts[0]), not the best of
+      // several. Cherry-picking whichever alternative happens to match inflated
+      // scores — saying nonsense could still land ~50%.
+      const heard = alts[0] ? alts[0].transcript : "";
+      cb.onResult && cb.onResult({ score: scoreMatch(target, heard), heard });
     };
     try { rec.start(); } catch (e) { cb.onError && cb.onError("start"); }
   }
