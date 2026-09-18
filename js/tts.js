@@ -14,7 +14,7 @@
    ============================================================ */
 
 // Paste a free VoiceRSS API key here to enable reliable audio on iPhone.
-const VOICE_KEY = "";
+const VOICE_KEY = "9739fedd6d874e94bbb2fc31bfeb8ccf";
 
 /* ---- speechSynthesis fallback (desktop / offline) ---- */
 let _voices = [];
