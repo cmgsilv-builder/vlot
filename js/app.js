@@ -595,6 +595,7 @@ function showFront(card) {
   const word = document.createElement("div"); word.className = "word";
   word.append(document.createTextNode(card.word), spkBtn(card.word));
   f.appendChild(word);
+  if (card.img) { const im = document.createElement("img"); im.className = "cardimg"; im.src = card.img; im.alt = ""; f.appendChild(im); }
   // Dutch example sentence up front (no English — that stays on the back).
   if (card.sentence) {
     const s = document.createElement("div"); s.className = "sentence";
