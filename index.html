@@ -102,12 +102,15 @@
       <label>Notes / hint <span class="muted">(optional)</span></label>
       <textarea id="cardNotes" placeholder="plural, irregular past, memory trick…"></textarea>
 
-      <label>Image <span class="muted">(type a word and search — free)</span></label>
+      <label>Image <span class="muted">(search, or 📷 use your own photo)</span></label>
       <div class="row">
         <input type="text" id="imgQuery" placeholder="Search images…" style="flex:1" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
         <button class="btn ghost small" id="searchImg">🔍 Search</button>
+        <button class="btn ghost small" id="photoBtn" aria-label="Use your own photo">📷</button>
+        <input type="file" id="photoFile" accept="image/*" hidden>
       </div>
       <div class="imgs" id="imgResults"></div>
+      <button class="btn ghost small" id="moreImg" hidden style="margin-top:8px;width:100%">More pictures</button>
       <div class="chosen" id="chosenWrap" hidden style="margin-top:8px">
         <label>Selected</label><img id="chosenImg" alt="">
       </div>

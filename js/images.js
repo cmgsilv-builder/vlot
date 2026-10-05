@@ -2,6 +2,7 @@
 /* ============================================================
    Vlot — free image search
    Sources (no API key, no signup):
+     0. Wikipedia (en + nl) — the article's lead photo: usually spot on.
      1. Iconify — colourful emoji (any word), plus plain icons for
         abstract words that have no good emoji.
      2. Openverse — everyday CC photos.
@@ -42,10 +43,24 @@ async function searchIcons(q) {
   return out;
 }
 
+// The lead image of the top Wikipedia articles for the word.
+async function searchWikipedia(q, lang) {
+  const url = "https://" + lang + ".wikipedia.org/w/api.php?action=query&generator=search" +
+    "&gsrsearch=" + encodeURIComponent(q) + "&gsrlimit=2&prop=pageimages&piprop=thumbnail|name" +
+    "&pithumbsize=320&format=json&origin=*";
+  const r = await fetch(url);
+  if (!r.ok) throw new Error("wikipedia");
+  const j = await r.json();
+  const pages = j.query && j.query.pages ? Object.values(j.query.pages) : [];
+  pages.sort((a, b) => (a.index || 0) - (b.index || 0));
+  return pages.filter((p) => p.thumbnail && !/\.svg$/i.test(p.pageimage || ""))
+    .map((p) => ({ thumb: p.thumbnail.source, full: p.thumbnail.source, title: p.pageimage || "", lead: true }));
+}
+
 // Openverse caps anonymous requests at page_size=20 (more → error, no results).
-async function searchOpenverse(q) {
+async function searchOpenverse(q, page) {
   const url = "https://api.openverse.org/v1/images/?q=" + encodeURIComponent(q) +
-    "&page_size=20&mature=false";
+    "&page_size=20&page=" + page + "&mature=false";
   const r = await fetch(url);
   if (!r.ok) throw new Error("openverse");
   const j = await r.json();
@@ -54,10 +69,10 @@ async function searchOpenverse(q) {
   }));
 }
 
-async function searchWikimedia(q) {
+async function searchWikimedia(q, page) {
   const url =
     "https://commons.wikimedia.org/w/api.php?action=query&generator=search" +
-    "&gsrsearch=" + encodeURIComponent(q + " filetype:bitmap") + "&gsrnamespace=6&gsrlimit=40" +
+    "&gsrsearch=" + encodeURIComponent(q + " filetype:bitmap") + "&gsrnamespace=6&gsrlimit=40&gsroffset=" + (page - 1) * 40 +
     "&prop=imageinfo&iiprop=url|user&iiurlwidth=240&format=json&origin=*";
   const r = await fetch(url);
   if (!r.ok) throw new Error("wikimedia");
@@ -70,26 +85,50 @@ async function searchWikimedia(q) {
   }));
 }
 
-async function searchImages(q) {
-  const settled = await Promise.allSettled([searchIcons(q), searchOpenverse(q), searchWikimedia(q)]);
+// Dedupe + per-uploader caps carry across "More" pages of the same query.
+let state = { q: null, seen: new Set(), perCreator: {} };
+
+// page 1: Wikipedia lead photos, icons, then photos. Later pages: photos only.
+async function searchImages(q, page = 1) {
+  if (page === 1 || state.q !== q) state = { q, seen: new Set(), perCreator: {} };
+  const jobs = page === 1
+    ? [searchWikipedia(q, "en"), searchWikipedia(q, "nl"), searchIcons(q), searchOpenverse(q, 1), searchWikimedia(q, 1)]
+    : [searchOpenverse(q, page), searchWikimedia(q, page)];
+  const settled = await Promise.allSettled(jobs);
   const merged = [];
-  const seen = new Set();
-  const perCreator = {};
   settled.forEach((s) => {
     if (s.status !== "fulfilled") return;
     s.value.forEach((res) => {
       const key = res.full || res.thumb;
-      if (!key || seen.has(key)) return;
-      if (res.title && JUNK.test(res.title)) return;
+      if (!key || state.seen.has(key)) return;
+      if (res.title && !res.lead && JUNK.test(res.title)) return;
       if (res.creator && !res.icon) {
-        perCreator[res.creator] = (perCreator[res.creator] || 0) + 1;
-        if (perCreator[res.creator] > PER_CREATOR) return;
+        state.perCreator[res.creator] = (state.perCreator[res.creator] || 0) + 1;
+        if (state.perCreator[res.creator] > PER_CREATOR) return;
       }
-      seen.add(key);
+      state.seen.add(key);
       merged.push(res);
     });
   });
   return merged;
+}
+
+// Own photo (camera or library) → small JPEG data URL, so storage stays light.
+function fileToDataURL(file, max = 480) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const u = URL.createObjectURL(file);
+    img.onload = () => {
+      const k = Math.min(1, max / Math.max(img.width, img.height));
+      const c = document.createElement("canvas");
+      c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+      c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(u);
+      resolve(c.toDataURL("image/jpeg", 0.82));
+    };
+    img.onerror = () => { URL.revokeObjectURL(u); reject(new Error("image")); };
+    img.src = u;
+  });
 }
 
 // Try to fetch + convert to a base64 data URL (offline-safe). Fall back to the URL.
@@ -106,4 +145,4 @@ async function toDataURL(url) {
   } catch (e) { return url; }
 }
 
-window.VlotImages = { searchImages, toDataURL };
+window.VlotImages = { searchImages, toDataURL, fileToDataURL };

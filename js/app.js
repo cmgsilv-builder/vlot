@@ -246,7 +246,7 @@ function openAdd(deckId, cardId, ret) {
   $("#addDeckLabel").textContent = "Deck: " + d.name;
   ["cardWord", "cardTrans", "cardSentence", "cardSentenceTrans", "cardNotes", "imgQuery"].forEach((id) => { $("#" + id).value = ""; });
   $("#cardPos").value = ""; $("#cardArticle").value = "";
-  $("#imgResults").innerHTML = ""; $("#chosenWrap").hidden = true; $("#articleWrap").hidden = true;
+  $("#imgResults").innerHTML = ""; $("#moreImg").hidden = true; $("#chosenWrap").hidden = true; $("#articleWrap").hidden = true;
   if (editingCardId) {
     const c = d.cards.find((x) => x.id === editingCardId);
     $("#cardWord").value = c.word || ""; $("#cardTrans").value = c.trans || "";
@@ -297,14 +297,9 @@ function updateCardCount() {
 /* image search */
 $("#searchImg").onclick = doSearch;
 $("#imgQuery").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); doSearch(); } });
-async function doSearch() {
-  const q = $("#imgQuery").value.trim();
-  if (!q) { toast("Type something to search."); return; }
+let imgQ = "", imgPage = 1;
+function addResults(results) {
   const box = $("#imgResults");
-  box.innerHTML = '<div class="muted" style="grid-column:1/-1">Searching…</div>';
-  const results = await IMG.searchImages(q);
-  if (!results.length) { box.innerHTML = '<div class="muted" style="grid-column:1/-1">Nothing found (or no internet).</div>'; return; }
-  box.innerHTML = "";
   results.forEach((res) => {
     const img = document.createElement("img");
     img.src = res.thumb; img.loading = "lazy"; img.alt = "";
@@ -314,6 +309,38 @@ async function doSearch() {
     box.appendChild(img);
   });
 }
+async function doSearch() {
+  const q = $("#imgQuery").value.trim();
+  if (!q) { toast("Type something to search."); return; }
+  const box = $("#imgResults"), more = $("#moreImg");
+  more.hidden = true;
+  box.innerHTML = '<div class="muted" style="grid-column:1/-1">Searching…</div>';
+  imgQ = q; imgPage = 1;
+  const results = await IMG.searchImages(q, 1);
+  if (!results.length) { box.innerHTML = '<div class="muted" style="grid-column:1/-1">Nothing found (or no internet).</div>'; return; }
+  box.innerHTML = "";
+  addResults(results);
+  more.hidden = false;
+}
+$("#moreImg").onclick = async () => {
+  const more = $("#moreImg");
+  more.disabled = true; more.textContent = "Loading…";
+  const results = await IMG.searchImages(imgQ, ++imgPage);
+  addResults(results);
+  more.disabled = false; more.textContent = "More pictures";
+  if (!results.length) { more.hidden = true; toast("No more pictures."); }
+};
+$("#photoBtn").onclick = () => $("#photoFile").click();
+$("#photoFile").onchange = async (e) => {
+  const file = e.target.files && e.target.files[0];
+  e.target.value = "";
+  if (!file) return;
+  try {
+    chosenImage = await IMG.fileToDataURL(file);
+    $$("#imgResults img").forEach((i) => i.classList.remove("sel"));
+    $("#chosenImg").src = chosenImage; $("#chosenWrap").hidden = false;
+  } catch (err) { toast("Couldn't read that photo."); }
+};
 async function pickImage(imgEl, res) {
   $$("#imgResults img").forEach((i) => i.classList.remove("sel"));
   imgEl.classList.add("sel");
@@ -362,7 +389,7 @@ $("#saveCard").onclick = async () => {
   // reset for the next card (keep deck + category for speed)
   ["cardWord", "cardTrans", "cardSentence", "cardSentenceTrans", "cardNotes", "imgQuery"].forEach((id) => { $("#" + id).value = ""; });
   $("#cardPos").value = ""; $("#cardArticle").value = "";
-  $("#imgResults").innerHTML = ""; $("#chosenWrap").hidden = true; chosenImage = null;
+  $("#imgResults").innerHTML = ""; $("#moreImg").hidden = true; $("#chosenWrap").hidden = true; chosenImage = null;
   populateCategories($("#cardCategory").value); updateCardCount();
   $("#cardWord").focus();
 };
