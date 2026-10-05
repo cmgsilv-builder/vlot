@@ -308,6 +308,7 @@ async function doSearch() {
   results.forEach((res) => {
     const img = document.createElement("img");
     img.src = res.thumb; img.loading = "lazy"; img.alt = "";
+    if (res.icon) img.className = "icon";
     img.onclick = () => pickImage(img, res);
     img.onerror = () => img.remove();
     box.appendChild(img);
